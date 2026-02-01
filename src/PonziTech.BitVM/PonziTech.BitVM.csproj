@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net10.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <LangVersion>13.0</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ImplicitUsings>enable</ImplicitUsings>
+    
+    <!-- Package Metadata -->
+    <PackageId>PonziTech.BitVM</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>PonziTech</Authors>
+    <Company>PonziTech</Company>
+    <Description>C# bindings for BitVM2 - Complete package including Core, Native, and Bridge components</Description>
+    <PackageTags>bitcoin;bitvm;bridge;layer2;snark;script;ffi;bindings</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/PonziTech/BitVM</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/PonziTech/BitVM</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    
+    <!-- This is a metapackage - no actual code, just dependencies -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <NoWarn>NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Reference all BitVM packages -->
+    <ProjectReference Include="..\PonziTech.BitVM.Core\PonziTech.BitVM.Core.csproj" />
+    <ProjectReference Include="..\PonziTech.BitVM.Native\PonziTech.BitVM.Native.csproj" />
+    <ProjectReference Include="..\PonziTech.BitVM.Bridge\PonziTech.BitVM.Bridge.csproj" />
+  </ItemGroup>
+
+</Project>

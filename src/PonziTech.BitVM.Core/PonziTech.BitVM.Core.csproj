@@ -43,32 +43,35 @@
   </ItemGroup>
 
   <!-- Native Libraries for NuGet Packaging -->
-  <ItemGroup>
-    <!-- Windows x64 -->
+  <!-- Only include when packing OR when native libraries exist -->
+  <ItemGroup Condition="Exists('..\..\runtimes\win-x64\native\bitvm_ffi.dll')">
     <None Include="..\..\runtimes\win-x64\native\bitvm_ffi.dll">
       <Pack>true</Pack>
       <PackagePath>runtimes/win-x64/native</PackagePath>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Visible>false</Visible>
     </None>
-    
-    <!-- Linux x64 -->
+  </ItemGroup>
+  
+  <ItemGroup Condition="Exists('..\..\runtimes\linux-x64\native\libbitvm_ffi.so')">
     <None Include="..\..\runtimes\linux-x64\native\libbitvm_ffi.so">
       <Pack>true</Pack>
       <PackagePath>runtimes/linux-x64/native</PackagePath>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Visible>false</Visible>
     </None>
-    
-    <!-- macOS x64 -->
+  </ItemGroup>
+  
+  <ItemGroup Condition="Exists('..\..\runtimes\osx-x64\native\libbitvm_ffi.dylib')">
     <None Include="..\..\runtimes\osx-x64\native\libbitvm_ffi.dylib">
       <Pack>true</Pack>
       <PackagePath>runtimes/osx-x64/native</PackagePath>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Visible>false</Visible>
     </None>
-    
-    <!-- macOS ARM64 -->
+  </ItemGroup>
+  
+  <ItemGroup Condition="Exists('..\..\runtimes\osx-arm64\native\libbitvm_ffi.dylib')">
     <None Include="..\..\runtimes\osx-arm64\native\libbitvm_ffi.dylib">
       <Pack>true</Pack>
       <PackagePath>runtimes/osx-arm64/native</PackagePath>
