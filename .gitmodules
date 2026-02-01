@@ -1,0 +1,3 @@
+[submodule "external/BitVM"]
+	path = external/BitVM
+	url = https://github.com/BitVM/BitVM.git
