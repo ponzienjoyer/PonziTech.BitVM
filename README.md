@@ -113,15 +113,6 @@ winget install Rustlang.Rustup
 winget install Microsoft.VisualStudio.2022.BuildTools
 ```
 
-**Option 3: Manual Download**
-- [Build Tools for Visual Studio 2022](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022)
-- During installation, select:
-  - "Desktop development with C++" workload, OR
-  - Individual components:
-    - MSVC v143 - VS 2022 C++ x64/x86 build tools
-    - Windows SDK
-    - C++ CMake tools for Windows
-
 #### macOS Requirements
 - Xcode Command Line Tools: `xcode-select --install`
 
@@ -133,7 +124,7 @@ winget install Microsoft.VisualStudio.2022.BuildTools
 
 ```bash
 # Check .NET
-dotnet --version  # Should be 8.0.x
+dotnet --version  # Should be 10.0.x
 
 # Check Rust
 cargo --version   # Should be 1.8x.x
