@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <LangVersion>12.0</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    
+    <!-- NBitcoin Flavor: Standard (public NuGet) or Okeanos (internal fork) -->
+    <NBitcoinFlavor Condition="'$(NBitcoinFlavor)' == ''">Standard</NBitcoinFlavor>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Conditional NBitcoin reference -->
+    <PackageReference Include="NBitcoin" Condition="'$(NBitcoinFlavor)' != 'Okeanos'" />
+    <ProjectReference Include="..\..\..\external\NBitcoin\NBitcoin.csproj" Condition="'$(NBitcoinFlavor)' == 'Okeanos'">
+      <PrivateAssets>none</PrivateAssets>
+    </ProjectReference>
+    
+    <PackageReference Include="System.Text.Json" />
+    <PackageReference Include="System.Memory" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PonziTech.BitVM.Native\PonziTech.BitVM.Native.csproj" />
+  </ItemGroup>
+
+</Project>
