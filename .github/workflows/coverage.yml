@@ -116,7 +116,7 @@ jobs:
           reportgenerator `
             -reports:$filesArg `
             -targetdir:./coverage-merged `
-            -reporttypes:Cobertura,Html,MarkdownSummaryGithub
+            -reporttypes:Cobertura;Html;MarkdownSummaryGithub
             
       - name: Upload Merged Coverage to Codecov
         uses: codecov/codecov-action@v4
