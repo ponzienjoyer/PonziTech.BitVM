@@ -87,8 +87,21 @@ jobs:
       - name: Build
         run: dotnet build PonziTech.BitVM.sln --configuration ${{ env.CONFIGURATION }} --no-restore /p:Platform="Any CPU"
         
-      - name: Test
+      - name: Test (Windows)
+        if: matrix.os == 'windows-latest'
         run: dotnet test PonziTech.BitVM.sln --configuration ${{ env.CONFIGURATION }} --no-build --verbosity normal
+        
+      - name: Test (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          export LD_LIBRARY_PATH=$PWD/runtimes/linux-x64/native:$LD_LIBRARY_PATH
+          dotnet test PonziTech.BitVM.sln --configuration ${{ env.CONFIGURATION }} --no-build --verbosity normal
+        
+      - name: Test (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          export DYLD_LIBRARY_PATH=$PWD/runtimes/osx-x64/native:$DYLD_LIBRARY_PATH
+          dotnet test PonziTech.BitVM.sln --configuration ${{ env.CONFIGURATION }} --no-build --verbosity normal
         
       - name: Upload Native Libraries
         uses: actions/upload-artifact@v4
