@@ -78,7 +78,7 @@ jobs:
             --no-build `
             --verbosity normal `
             /p:CollectCoverage=true `
-            /p:CoverletOutputFormat=cobertura,json,opencover `
+            "/p:CoverletOutputFormat=cobertura%3bjson%3bopencover" `
             /p:CoverletOutput=./TestResults/coverage/
             
           dotnet test tests/PonziTech.BitVM.IntegrationTests/PonziTech.BitVM.IntegrationTests.csproj `
@@ -86,7 +86,7 @@ jobs:
             --no-build `
             --verbosity normal `
             /p:CollectCoverage=true `
-            /p:CoverletOutputFormat=cobertura,json,opencover `
+            "/p:CoverletOutputFormat=cobertura%3bjson%3bopencover" `
             /p:CoverletOutput=./TestResults/coverage/
             
       - name: Merge Coverage Reports
