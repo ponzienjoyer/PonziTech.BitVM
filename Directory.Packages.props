@@ -1,0 +1,28 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+    
+    <!-- NBitcoin Flavor: Standard (public NuGet) or Okeanos (internal fork) -->
+    <NBitcoinFlavor Condition="'$(NBitcoinFlavor)' == ''">Standard</NBitcoinFlavor>
+    
+    <!-- Package ID based on flavor -->
+    <NBitcoinPackageId Condition="'$(NBitcoinFlavor)' == 'Okeanos'">Okeanos.NBitcoin</NBitcoinPackageId>
+    <NBitcoinPackageId Condition="'$(NBitcoinFlavor)' != 'Okeanos'">NBitcoin</NBitcoinPackageId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Standard NBitcoin from NuGet (default) -->
+    <PackageVersion Include="NBitcoin" Version="7.0.34" />
+    
+    <!-- Serialization & Memory -->
+    <PackageVersion Include="System.Text.Json" Version="8.0.5" />
+    <PackageVersion Include="System.Memory" Version="4.5.5" />
+
+    <!-- Testing -->
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
+    <PackageVersion Include="xunit" Version="2.9.0" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageVersion Include="coverlet.collector" Version="6.0.2" />
+  </ItemGroup>
+</Project>
