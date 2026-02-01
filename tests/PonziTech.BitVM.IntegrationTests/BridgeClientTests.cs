@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Xunit;
 using NBitcoin;
 using PonziTech.BitVM.Bridge;
@@ -22,7 +23,7 @@ public class BridgeClientTests : IDisposable
         _config = new BridgeConfiguration
         {
             Network = BitcoinNetwork.Regtest,
-            VerifierPublicKeys = new[] { RandomUtils.GetBytes(33) }
+            VerifierPublicKeys = CreateVerifierKeys(1)
         };
         _client = new BridgeClient(_config);
     }
@@ -185,5 +186,12 @@ public class BridgeClientTests : IDisposable
     public void Dispose()
     {
         _client?.Dispose();
+    }
+
+    private static byte[][] CreateVerifierKeys(int count)
+    {
+        return Enumerable.Range(0, count)
+            .Select(_ => new Key().PubKey.ToBytes())
+            .ToArray();
     }
 }
