@@ -1,35 +1,68 @@
 use crate::FfiResult;
-use bitvm::treepp::script;
-use bitvm::{execute_script, execute_script_with_inputs};
+use bitcoin::ScriptBuf;
+use bitvm::{execute_raw_script_with_inputs, execute_script_buf, ExecuteInfo};
+use serde::Serialize;
 use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::slice;
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ExecStatsDto {
+    max_stack_size: usize,
+    max_alt_stack_size: usize,
+    opcode_count: usize,
+    start_validation_weight: i64,
+    validation_weight: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ExecuteInfoDto {
+    success: bool,
+    error: Option<String>,
+    final_stack: String,
+    remaining_script: String,
+    last_opcode: Option<String>,
+    stats: ExecStatsDto,
+}
+
+fn execution_info_to_json(info: ExecuteInfo) -> FfiResult {
+    let stats = ExecStatsDto {
+        max_stack_size: info.stats.max_nb_stack_items,
+        max_alt_stack_size: 0,
+        opcode_count: info.stats.opcode_count,
+        start_validation_weight: info.stats.start_validation_weight,
+        validation_weight: info.stats.validation_weight,
+    };
+
+    let dto = ExecuteInfoDto {
+        success: info.success,
+        error: info.error.map(|err| format!("{:?}", err)),
+        final_stack: format!("{:4}", info.final_stack),
+        remaining_script: info.remaining_script,
+        last_opcode: info.last_opcode.map(|op| format!("{:?}", op)),
+        stats,
+    };
+
+    match serde_json::to_vec(&dto) {
+        Ok(data) => FfiResult::ok(data),
+        Err(e) => FfiResult::err(&format!("JSON serialization error: {}", e)),
+    }
+}
+
 /// Execute a Bitcoin script and return the result as JSON
 #[no_mangle]
 pub extern "C" fn bitvm_execute_script(script_bytes: *const u8, script_len: usize) -> FfiResult {
-    if script_bytes.is_null() {
-        return FfiResult::err("Null script bytes pointer");
+    if script_bytes.is_null() && script_len != 0 {
+        return FfiResult::err("Null script bytes pointer with non-zero length");
     }
 
     let script_slice = unsafe { slice::from_raw_parts(script_bytes, script_len) };
+    let script_buf = ScriptBuf::from_bytes(script_slice.to_vec());
 
-    let script = script! {
-        for byte in script_slice {
-            { *byte as i64 }
-        }
-    };
-
-    let result = execute_script(script);
-
-    // Manual JSON serialization since ExecuteInfo doesn't implement Serialize
-    let json = format!(
-        r#"{{"success":{},"error":null,"final_stack":"","remaining_script":"{}"}}"#,
-        result.success,
-        result.remaining_script.replace("\"", "\\\"")
-    );
-
-    FfiResult::ok(json.into_bytes())
+    let result = execute_script_buf(script_buf);
+    execution_info_to_json(result)
 }
 
 /// Execute a script with witness inputs
@@ -39,7 +72,7 @@ pub extern "C" fn bitvm_execute_script_with_witness(
     script_len: usize,
     witness_json: *const c_char,
 ) -> FfiResult {
-    if script_bytes.is_null() || witness_json.is_null() {
+    if (script_bytes.is_null() && script_len != 0) || witness_json.is_null() {
         return FfiResult::err("Null pointer argument");
     }
 
@@ -56,22 +89,8 @@ pub extern "C" fn bitvm_execute_script_with_witness(
         Err(e) => return FfiResult::err(&format!("JSON parse error: {}", e)),
     };
 
-    let script = script! {
-        for byte in script_slice {
-            { *byte as i64 }
-        }
-    };
-
-    let result = execute_script_with_inputs(script, witness);
-
-    // Manual JSON serialization
-    let json = format!(
-        r#"{{"success":{},"error":null,"final_stack":"","remaining_script":"{}"}}"#,
-        result.success,
-        result.remaining_script.replace("\"", "\\\"")
-    );
-
-    FfiResult::ok(json.into_bytes())
+    let result = execute_raw_script_with_inputs(script_slice.to_vec(), witness);
+    execution_info_to_json(result)
 }
 
 /// Generate a SHA256 script for the given message length

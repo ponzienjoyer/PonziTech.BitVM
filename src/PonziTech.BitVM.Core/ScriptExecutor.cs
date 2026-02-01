@@ -1,7 +1,6 @@
 using System;
-using System.Runtime.InteropServices;
-using System.Text;
 using System.Text.Json;
+using System.Threading.Tasks;
 using PonziTech.BitVM.Native;
 
 namespace PonziTech.BitVM.Core;
@@ -35,19 +34,17 @@ public class ExecutionStats
 public class ScriptExecutor : IDisposable
 {
     private bool _disposed;
-    private readonly bool _ownsInitialization;
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     /// <summary>
     /// Creates a new script executor
     /// </summary>
     public ScriptExecutor()
     {
-        _ownsInitialization = true;
-        var result = BitVMNative.bitvm_init();
-        if (result != 0)
-        {
-            throw new InvalidOperationException("Failed to initialize BitVM FFI");
-        }
+        BitVmNativeRuntime.AddRef();
     }
 
     /// <summary>
@@ -63,19 +60,14 @@ public class ScriptExecutor : IDisposable
         {
             fixed (byte* scriptPtr = script)
             {
-                // This would call the actual FFI method
-                // For now, return a placeholder result
-                return new ScriptExecutionResult
+                var result = BitVMNative.bitvm_execute_script(scriptPtr, (nuint)script.Length);
+                var jsonBytes = FfiHelpers.ReadBytes(result);
+                var executionResult = JsonSerializer.Deserialize<ScriptExecutionResult>(jsonBytes, JsonOptions);
+                if (executionResult == null)
                 {
-                    Success = true,
-                    FinalStack = "[]",
-                    Stats = new ExecutionStats
-                    {
-                        MaxStackSize = 0,
-                        MaxAltStackSize = 0,
-                        OpcodeCount = script.Length
-                    }
-                };
+                    throw new FFIException("Failed to deserialize script execution result");
+                }
+                return executionResult;
             }
         }
     }
@@ -90,11 +82,53 @@ public class ScriptExecutor : IDisposable
     {
         ThrowIfDisposed();
 
-        var witnessJson = JsonSerializer.Serialize(witness);
-        
-        // Call FFI method here
-        // Placeholder implementation
-        return Execute(script);
+        if (witness == null)
+        {
+            throw new ArgumentNullException(nameof(witness));
+        }
+
+        var witnessJson = FfiHelpers.SerializeByteMatrix(witness);
+        var witnessJsonNullTerminated = FfiHelpers.WithNullTerminator(witnessJson);
+
+        unsafe
+        {
+            fixed (byte* scriptPtr = script)
+            fixed (byte* witnessPtr = witnessJsonNullTerminated)
+            {
+                var result = BitVMNative.bitvm_execute_script_with_witness(
+                    scriptPtr,
+                    (nuint)script.Length,
+                    witnessPtr);
+                var jsonBytes = FfiHelpers.ReadBytes(result);
+                var executionResult = JsonSerializer.Deserialize<ScriptExecutionResult>(jsonBytes, JsonOptions);
+                if (executionResult == null)
+                {
+                    throw new FFIException("Failed to deserialize script execution result");
+                }
+                return executionResult;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Executes a Bitcoin script asynchronously
+    /// </summary>
+    /// <param name="script">The script bytecode to execute</param>
+    /// <returns>Execution result</returns>
+    public Task<ScriptExecutionResult> ExecuteAsync(ReadOnlyMemory<byte> script)
+    {
+        return Task.FromResult(Execute(script.Span));
+    }
+
+    /// <summary>
+    /// Executes a script with witness inputs asynchronously
+    /// </summary>
+    /// <param name="script">The script bytecode</param>
+    /// <param name="witness">Witness data as array of byte arrays</param>
+    /// <returns>Execution result</returns>
+    public Task<ScriptExecutionResult> ExecuteWithWitnessAsync(ReadOnlyMemory<byte> script, byte[][] witness)
+    {
+        return Task.FromResult(ExecuteWithWitness(script.Span, witness));
     }
 
     /// <summary>
@@ -105,10 +139,14 @@ public class ScriptExecutor : IDisposable
     public byte[] GenerateSha256Script(int messageLength)
     {
         ThrowIfDisposed();
-        
-        // Call FFI: bitvm_sha256_script
-        // Placeholder: return empty script
-        return new byte[] { 0x00 };
+
+        if (messageLength < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(messageLength), "Message length must be non-negative");
+        }
+
+        var result = BitVMNative.bitvm_sha256_script((nuint)messageLength);
+        return FfiHelpers.ReadBytes(result);
     }
 
     /// <summary>
@@ -118,9 +156,9 @@ public class ScriptExecutor : IDisposable
     public byte[] GenerateSha256Script32Bytes()
     {
         ThrowIfDisposed();
-        
-        // Call FFI: bitvm_sha256_32bytes_script
-        return new byte[] { 0x00 };
+
+        var result = BitVMNative.bitvm_sha256_32bytes_script();
+        return FfiHelpers.ReadBytes(result);
     }
 
     /// <summary>
@@ -131,9 +169,14 @@ public class ScriptExecutor : IDisposable
     public byte[] GenerateBlake3Script(int messageLength)
     {
         ThrowIfDisposed();
-        
-        // Call FFI: bitvm_blake3_script
-        return new byte[] { 0x00 };
+
+        if (messageLength < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(messageLength), "Message length must be non-negative");
+        }
+
+        var result = BitVMNative.bitvm_blake3_script((nuint)messageLength);
+        return FfiHelpers.ReadBytes(result);
     }
 
     /// <summary>
@@ -144,9 +187,9 @@ public class ScriptExecutor : IDisposable
     public byte[] GenerateU32PushScript(uint value)
     {
         ThrowIfDisposed();
-        
-        // Call FFI: bitvm_u32_push_script
-        return new byte[] { 0x00 };
+
+        var result = BitVMNative.bitvm_u32_push_script(value);
+        return FfiHelpers.ReadBytes(result);
     }
 
     /// <summary>
@@ -156,9 +199,9 @@ public class ScriptExecutor : IDisposable
     public byte[] GenerateU32EqualVerifyScript()
     {
         ThrowIfDisposed();
-        
-        // Call FFI: bitvm_u32_equalverify_script
-        return new byte[] { 0x00 };
+
+        var result = BitVMNative.bitvm_u32_equalverify_script();
+        return FfiHelpers.ReadBytes(result);
     }
 
     private void ThrowIfDisposed()
@@ -174,10 +217,7 @@ public class ScriptExecutor : IDisposable
     {
         if (!_disposed)
         {
-            if (_ownsInitialization)
-            {
-                BitVMNative.bitvm_cleanup();
-            }
+            BitVmNativeRuntime.Release();
             _disposed = true;
         }
     }
