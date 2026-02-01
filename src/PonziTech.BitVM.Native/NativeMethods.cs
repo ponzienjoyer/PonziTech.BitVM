@@ -151,6 +151,48 @@ namespace PonziTech.BitVM.Native
         [DllImport(__DllName, EntryPoint = "crypto_winternitz_checksig_script", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern FfiResult crypto_winternitz_checksig_script(byte* pubkey_json, uint message_size, [MarshalAs(UnmanagedType.U1)] bool compact);
 
+        /// <summary>
+        ///  Create a depositor context
+        /// </summary>
+        [DllImport(__DllName, EntryPoint = "bridge_create_depositor_context", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern FfiResult bridge_create_depositor_context(byte* network, byte* depositor_secret, byte* verifier_public_keys_json);
+
+        /// <summary>
+        ///  Create an operator context
+        /// </summary>
+        [DllImport(__DllName, EntryPoint = "bridge_create_operator_context", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern FfiResult bridge_create_operator_context(byte* network, byte* operator_secret, byte* verifier_public_keys_json);
+
+        /// <summary>
+        ///  Create a verifier context
+        /// </summary>
+        [DllImport(__DllName, EntryPoint = "bridge_create_verifier_context", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern FfiResult bridge_create_verifier_context(byte* network, byte* verifier_secret, byte* verifier_public_keys_json);
+
+        /// <summary>
+        ///  Create a peg-in graph
+        /// </summary>
+        [DllImport(__DllName, EntryPoint = "bridge_create_peg_in_graph", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern FfiResult bridge_create_peg_in_graph(byte* context_json, byte* deposit_txid, uint deposit_vout, ulong deposit_amount, byte* evm_address);
+
+        /// <summary>
+        ///  Get peg-in graph status for depositor
+        /// </summary>
+        [DllImport(__DllName, EntryPoint = "bridge_get_peg_in_depositor_status", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern FfiResult bridge_get_peg_in_depositor_status(byte* graph_json, byte* esplora_url);
+
+        /// <summary>
+        ///  Serialize a peg-in graph to JSON
+        /// </summary>
+        [DllImport(__DllName, EntryPoint = "bridge_serialize_peg_in_graph", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern FfiResult bridge_serialize_peg_in_graph(byte* graph_json);
+
+        /// <summary>
+        ///  Deserialize a peg-in graph from JSON
+        /// </summary>
+        [DllImport(__DllName, EntryPoint = "bridge_deserialize_peg_in_graph", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern FfiResult bridge_deserialize_peg_in_graph(byte* json_data);
+
 
     }
 

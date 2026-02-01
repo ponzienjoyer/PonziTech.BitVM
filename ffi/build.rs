@@ -10,6 +10,7 @@ fn main() {
         .input_extern_file(Path::new(&crate_dir).join("src/lib.rs"))
         .input_extern_file(Path::new(&crate_dir).join("src/core.rs"))
         .input_extern_file(Path::new(&crate_dir).join("src/crypto.rs"))
+        .input_extern_file(Path::new(&crate_dir).join("src/bridge.rs"))
         .csharp_dll_name("bitvm_ffi")
         .csharp_namespace("PonziTech.BitVM.Native")
         .csharp_class_name("BitVMNative")
@@ -23,4 +24,5 @@ fn main() {
     println!("cargo:rerun-if-changed=src/lib.rs");
     println!("cargo:rerun-if-changed=src/core.rs");
     println!("cargo:rerun-if-changed=src/crypto.rs");
+    println!("cargo:rerun-if-changed=src/bridge.rs");
 }

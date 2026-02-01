@@ -1,7 +1,11 @@
 using System;
+using System.Collections.Generic;
+using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using NBitcoin;
 using PonziTech.BitVM.Core;
+using PonziTech.BitVM.Native;
 
 namespace PonziTech.BitVM.Bridge;
 
@@ -69,6 +73,16 @@ public class DepositorContext : IDisposable
     /// <param name="secret">Secret key (WIF or hex)</param>
     public static DepositorContext Create(BridgeConfiguration config, string secret)
     {
+        if (config == null)
+        {
+            throw new ArgumentNullException(nameof(config));
+        }
+
+        if (string.IsNullOrWhiteSpace(secret))
+        {
+            throw new ArgumentException("Secret is required", nameof(secret));
+        }
+
         // Parse secret key
         Key key;
         try
@@ -117,6 +131,8 @@ public class DepositorContext : IDisposable
 
     internal byte[] GetSecretBytes() => _key.ToBytes();
 
+    internal string GetSecretHex() => Convert.ToHexString(_key.ToBytes()).ToLowerInvariant();
+
     public void Dispose()
     {
         if (!_disposed)
@@ -140,6 +156,7 @@ public class PegInGraph
     public uint256? DepositTxid { get; set; }
     public uint? DepositVout { get; set; }
     public Money? DepositAmount { get; set; }
+    public string? RawJson { get; set; }
 }
 
 /// <summary>
@@ -148,11 +165,11 @@ public class PegInGraph
 public enum PegInDepositorStatus
 {
     Unknown,
-    DepositRequested,
-    DepositConfirmed,
-    PegInConfirmed,
-    RefundAvailable,
-    Refunded
+    PegInDepositWait,
+    PegInConfirmWait,
+    PegInConfirmComplete,
+    PegInRefundAvailable,
+    PegInRefundComplete
 }
 
 /// <summary>
@@ -162,6 +179,10 @@ public class BridgeClient : IDisposable
 {
     private readonly BridgeConfiguration _config;
     private bool _disposed;
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     /// <summary>
     /// Creates a new bridge client
@@ -175,6 +196,18 @@ public class BridgeClient : IDisposable
         {
             throw new ArgumentException("At least one verifier public key is required", nameof(config));
         }
+
+        if (config.MinimumVerifiers < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(config.MinimumVerifiers), "Minimum verifiers must be at least 1");
+        }
+
+        if (config.VerifierPublicKeys.Length < config.MinimumVerifiers)
+        {
+            throw new ArgumentException("Verifier public keys must satisfy MinimumVerifiers", nameof(config));
+        }
+
+        BitVmNativeRuntime.AddRef();
     }
 
     /// <summary>
@@ -182,33 +215,41 @@ public class BridgeClient : IDisposable
     /// </summary>
     /// <param name="depositor">Depositor context</param>
     /// <param name="depositOutpoint">Deposit transaction outpoint</param>
+    /// <param name="depositAmount">Deposit amount in satoshis</param>
     /// <param name="evmAddress">Destination EVM address (e.g., "0x1234...")</param>
     /// <returns>Peg-in graph</returns>
     public async Task<PegInGraph> CreatePegInAsync(
         DepositorContext depositor,
         OutPoint depositOutpoint,
+        Money depositAmount,
         string evmAddress)
     {
         ThrowIfDisposed();
 
-        if (string.IsNullOrEmpty(evmAddress))
+        if (depositor == null)
+        {
+            throw new ArgumentNullException(nameof(depositor));
+        }
+
+        if (string.IsNullOrWhiteSpace(evmAddress))
         {
             throw new ArgumentException("EVM address is required", nameof(evmAddress));
         }
 
-        // Create graph via FFI
-        // Placeholder implementation
-        var graph = new PegInGraph
+        if (depositAmount <= Money.Zero)
         {
-            Id = Guid.NewGuid().ToString("N"),
-            Network = _config.Network.ToString().ToLowerInvariant(),
-            DepositorEvmAddress = evmAddress,
-            DepositorPublicKey = depositor.PublicKey.ToBytes(),
-            VerifierPublicKeys = _config.VerifierPublicKeys,
-            DepositTxid = depositOutpoint.Hash,
-            DepositVout = depositOutpoint.N,
-            DepositAmount = Money.Coins(1.0m) // Placeholder
-        };
+            throw new ArgumentOutOfRangeException(nameof(depositAmount), "Deposit amount must be positive");
+        }
+
+        var contextJson = CreateDepositorContextJson(depositor);
+        var graphJson = CreatePegInGraphJson(contextJson, depositOutpoint, depositAmount, evmAddress);
+
+        var graph = ParsePegInGraph(graphJson);
+        graph.VerifierPublicKeys = _config.VerifierPublicKeys;
+        graph.DepositTxid = depositOutpoint.Hash;
+        graph.DepositVout = depositOutpoint.N;
+        graph.DepositAmount = depositAmount;
+        graph.RawJson = graphJson;
 
         return await Task.FromResult(graph);
     }
@@ -222,9 +263,41 @@ public class BridgeClient : IDisposable
     {
         ThrowIfDisposed();
 
-        // Query via FFI
-        // Placeholder: return requested
-        return await Task.FromResult(PegInDepositorStatus.DepositRequested);
+        if (graph == null)
+        {
+            throw new ArgumentNullException(nameof(graph));
+        }
+
+        if (string.IsNullOrWhiteSpace(graph.RawJson))
+        {
+            throw new ArgumentException("Peg-in graph is missing raw JSON data", nameof(graph));
+        }
+
+        var graphJsonBytes = FfiHelpers.GetNullTerminatedUtf8(graph.RawJson);
+        byte[]? esploraBytes = null;
+        if (!string.IsNullOrWhiteSpace(_config.EsploraUrl))
+        {
+            esploraBytes = FfiHelpers.GetNullTerminatedUtf8(_config.EsploraUrl);
+        }
+
+        unsafe
+        {
+            fixed (byte* graphPtr = graphJsonBytes)
+            fixed (byte* esploraPtr = esploraBytes)
+            {
+                var result = BitVMNative.bridge_get_peg_in_depositor_status(
+                    graphPtr,
+                    esploraBytes == null ? null : esploraPtr);
+                var jsonBytes = FfiHelpers.ReadBytes(result);
+                var statusDto = JsonSerializer.Deserialize<PegInStatusDto>(jsonBytes, JsonOptions);
+                if (statusDto == null || string.IsNullOrWhiteSpace(statusDto.Code))
+                {
+                    throw new FFIException("Failed to deserialize peg-in status");
+                }
+
+                return await Task.FromResult(ParseStatus(statusDto.Code));
+            }
+        }
     }
 
     /// <summary>
@@ -235,10 +308,27 @@ public class BridgeClient : IDisposable
     public string SerializePegInGraph(PegInGraph graph)
     {
         ThrowIfDisposed();
-        
-        // Serialize via FFI
-        // Placeholder: return simple JSON
-        return $"{{\"id\":\"{graph.Id}\",\"network\":\"{graph.Network}\",\"evm\":\"{graph.DepositorEvmAddress}\"}}";
+
+        if (graph == null)
+        {
+            throw new ArgumentNullException(nameof(graph));
+        }
+
+        if (string.IsNullOrWhiteSpace(graph.RawJson))
+        {
+            throw new ArgumentException("Peg-in graph is missing raw JSON data", nameof(graph));
+        }
+
+        var graphJsonBytes = FfiHelpers.GetNullTerminatedUtf8(graph.RawJson);
+        unsafe
+        {
+            fixed (byte* graphPtr = graphJsonBytes)
+            {
+                var result = BitVMNative.bridge_serialize_peg_in_graph(graphPtr);
+                var jsonBytes = FfiHelpers.ReadBytes(result);
+                return Encoding.UTF8.GetString(jsonBytes);
+            }
+        }
     }
 
     /// <summary>
@@ -249,10 +339,25 @@ public class BridgeClient : IDisposable
     public PegInGraph DeserializePegInGraph(string json)
     {
         ThrowIfDisposed();
-        
-        // Deserialize via FFI
-        // Placeholder: return empty graph
-        return new PegInGraph { Id = "placeholder" };
+
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            throw new ArgumentException("JSON is required", nameof(json));
+        }
+
+        var jsonBytes = FfiHelpers.GetNullTerminatedUtf8(json);
+        unsafe
+        {
+            fixed (byte* jsonPtr = jsonBytes)
+            {
+                var result = BitVMNative.bridge_deserialize_peg_in_graph(jsonPtr);
+                var normalizedBytes = FfiHelpers.ReadBytes(result);
+                var normalizedJson = Encoding.UTF8.GetString(normalizedBytes);
+                var graph = ParsePegInGraph(normalizedJson);
+                graph.RawJson = normalizedJson;
+                return graph;
+            }
+        }
     }
 
     private void ThrowIfDisposed()
@@ -265,6 +370,182 @@ public class BridgeClient : IDisposable
 
     public void Dispose()
     {
-        _disposed = true;
+        if (!_disposed)
+        {
+            BitVmNativeRuntime.Release();
+            _disposed = true;
+        }
+    }
+
+    private string CreateDepositorContextJson(DepositorContext depositor)
+    {
+        var network = _config.Network.ToString().ToLowerInvariant();
+        var secretHex = depositor.GetSecretHex();
+        var verifierKeysJson = JsonSerializer.Serialize(ToHexStrings(_config.VerifierPublicKeys));
+
+        var networkBytes = FfiHelpers.GetNullTerminatedUtf8(network);
+        var secretBytes = FfiHelpers.GetNullTerminatedUtf8(secretHex);
+        var verifierBytes = FfiHelpers.GetNullTerminatedUtf8(verifierKeysJson);
+
+        unsafe
+        {
+            fixed (byte* networkPtr = networkBytes)
+            fixed (byte* secretPtr = secretBytes)
+            fixed (byte* verifierPtr = verifierBytes)
+            {
+                var result = BitVMNative.bridge_create_depositor_context(
+                    networkPtr,
+                    secretPtr,
+                    verifierPtr);
+                var jsonBytes = FfiHelpers.ReadBytes(result);
+                return Encoding.UTF8.GetString(jsonBytes);
+            }
+        }
+    }
+
+    private string CreatePegInGraphJson(
+        string contextJson,
+        OutPoint depositOutpoint,
+        Money depositAmount,
+        string evmAddress)
+    {
+        var contextBytes = FfiHelpers.GetNullTerminatedUtf8(contextJson);
+        var txidBytes = FfiHelpers.GetNullTerminatedUtf8(depositOutpoint.Hash.ToString());
+        var evmBytes = FfiHelpers.GetNullTerminatedUtf8(evmAddress);
+
+        unsafe
+        {
+            fixed (byte* contextPtr = contextBytes)
+            fixed (byte* txidPtr = txidBytes)
+            fixed (byte* evmPtr = evmBytes)
+            {
+                var result = BitVMNative.bridge_create_peg_in_graph(
+                    contextPtr,
+                    txidPtr,
+                    depositOutpoint.N,
+                    (ulong)depositAmount.Satoshi,
+                    evmPtr);
+                var jsonBytes = FfiHelpers.ReadBytes(result);
+                return Encoding.UTF8.GetString(jsonBytes);
+            }
+        }
+    }
+
+    private static PegInGraph ParsePegInGraph(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+
+        var graph = new PegInGraph
+        {
+            Id = root.TryGetProperty("id", out var id) ? id.GetString() ?? string.Empty : string.Empty,
+            Network = root.TryGetProperty("network", out var network)
+                ? network.GetString() ?? string.Empty
+                : string.Empty,
+            DepositorEvmAddress = root.TryGetProperty("depositor_evm_address", out var evm)
+                ? evm.GetString() ?? string.Empty
+                : string.Empty,
+            DepositorPublicKey = TryParseHexBytes(root, "depositor_public_key"),
+            VerifierPublicKeys = TryParseHexArray(root, "n_of_n_public_keys")
+        };
+
+        return graph;
+    }
+
+    private static byte[] TryParseHexBytes(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var element))
+        {
+            return Array.Empty<byte>();
+        }
+
+        if (element.ValueKind != JsonValueKind.String)
+        {
+            return Array.Empty<byte>();
+        }
+
+        var hex = element.GetString();
+        if (string.IsNullOrWhiteSpace(hex))
+        {
+            return Array.Empty<byte>();
+        }
+
+        try
+        {
+            return Convert.FromHexString(hex);
+        }
+        catch
+        {
+            return Array.Empty<byte>();
+        }
+    }
+
+    private static byte[][] TryParseHexArray(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out var element))
+        {
+            return Array.Empty<byte[]>();
+        }
+
+        if (element.ValueKind != JsonValueKind.Array)
+        {
+            return Array.Empty<byte[]>();
+        }
+
+        var list = new List<byte[]>();
+        foreach (var item in element.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.String)
+            {
+                continue;
+            }
+
+            var hex = item.GetString();
+            if (string.IsNullOrWhiteSpace(hex))
+            {
+                continue;
+            }
+
+            try
+            {
+                list.Add(Convert.FromHexString(hex));
+            }
+            catch
+            {
+                // Ignore malformed entries
+            }
+        }
+
+        return list.ToArray();
+    }
+
+    private static PegInDepositorStatus ParseStatus(string code)
+    {
+        return code switch
+        {
+            "PegInDepositWait" => PegInDepositorStatus.PegInDepositWait,
+            "PegInConfirmWait" => PegInDepositorStatus.PegInConfirmWait,
+            "PegInConfirmComplete" => PegInDepositorStatus.PegInConfirmComplete,
+            "PegInRefundAvailable" => PegInDepositorStatus.PegInRefundAvailable,
+            "PegInRefundComplete" => PegInDepositorStatus.PegInRefundComplete,
+            _ => PegInDepositorStatus.Unknown
+        };
+    }
+
+    private static string[] ToHexStrings(byte[][] entries)
+    {
+        var result = new string[entries.Length];
+        for (var i = 0; i < entries.Length; i++)
+        {
+            result[i] = Convert.ToHexString(entries[i]).ToLowerInvariant();
+        }
+        return result;
+    }
+
+    private sealed class PegInStatusDto
+    {
+        public string? Code { get; set; }
+        public string? Message { get; set; }
+        public string? GraphId { get; set; }
     }
 }

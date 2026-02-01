@@ -3,21 +3,17 @@
 
 pub mod core;
 pub mod crypto;
+pub mod bridge;
 
 use std::ffi::CString;
 use std::os::raw::c_char;
 use std::ptr;
 
-/// FFI Version string - must be null-terminated for C compatibility
-static VERSION_CSTRING: std::sync::LazyLock<CString> = std::sync::LazyLock::new(|| {
-    CString::new(env!("CARGO_PKG_VERSION")).expect("Version string contains null")
-});
-
 /// Returns the FFI version as a C string
 /// The caller is responsible for freeing the returned pointer using bitvm_free_string()
 #[no_mangle]
 pub extern "C" fn bitvm_ffi_version() -> *mut c_char {
-    VERSION_CSTRING.as_ptr() as *mut c_char
+    string_to_cstring(env!("CARGO_PKG_VERSION"))
 }
 
 /// Initialize the BitVM FFI layer
@@ -121,6 +117,9 @@ mod tests {
     fn test_version() {
         let version_ptr = bitvm_ffi_version();
         assert!(!version_ptr.is_null());
+        unsafe {
+            bitvm_free_string(version_ptr);
+        }
     }
 
     #[test]
