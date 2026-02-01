@@ -9,6 +9,21 @@
     
     <!-- NBitcoin Flavor: Standard (public NuGet) or Okeanos (internal fork) -->
     <NBitcoinFlavor Condition="'$(NBitcoinFlavor)' == ''">Standard</NBitcoinFlavor>
+    
+    <!-- Package Metadata -->
+    <PackageId>PonziTech.BitVM.Bridge</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>PonziTech</Authors>
+    <Company>PonziTech</Company>
+    <Description>C# bindings for BitVM2 - Bridge operations (peg-in/peg-out graphs, Bitcoin bridging)</Description>
+    <PackageTags>bitcoin;bitvm;bridge;layer2;snark;peg-in;peg-out</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/PonziTech/BitVM</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/PonziTech/BitVM</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>

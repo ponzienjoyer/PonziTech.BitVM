@@ -10,6 +10,21 @@
     
     <!-- NBitcoin Flavor: Standard (public NuGet) or Okeanos (internal fork) -->
     <NBitcoinFlavor Condition="'$(NBitcoinFlavor)' == ''">Standard</NBitcoinFlavor>
+    
+    <!-- Package Metadata -->
+    <PackageId>PonziTech.BitVM.Core</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>PonziTech</Authors>
+    <Company>PonziTech</Company>
+    <Description>C# bindings for BitVM2 - Core operations (script execution, Winternitz signatures, hash functions)</Description>
+    <PackageTags>bitcoin;bitvm;bridge;layer2;snark;script</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/PonziTech/BitVM</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/PonziTech/BitVM</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>

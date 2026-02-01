@@ -1,0 +1,237 @@
+name: Publish NuGet Packages
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 0.1.0)'
+        required: true
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  CONFIGURATION: Release
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  #############################################################################
+  # Build Native Libraries (Windows)
+  #############################################################################
+  build-native:
+    name: Build Native Libraries
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build FFI
+        run: |
+          cd ffi
+          cargo build --release
+
+      - name: Upload native libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-libraries
+          path: ffi/target/release/bitvm_ffi.dll
+          retention-days: 1
+
+  #############################################################################
+  # Build and Pack
+  #############################################################################
+  build-and-pack:
+    name: Build and Pack NuGet Packages
+    needs: build-native
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Download native libraries
+        uses: actions/download-artifact@v4
+        with:
+          name: native-libraries
+          path: runtimes/win-x64/native/
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        run: dotnet restore PonziTech.BitVM.sln /p:Platform="Any CPU"
+
+      - name: Build solution
+        run: dotnet build PonziTech.BitVM.sln --configuration ${{ env.CONFIGURATION }} --no-restore /p:Platform="Any CPU"
+
+      - name: Run tests
+        run: |
+          dotnet test PonziTech.BitVM.sln \
+            --configuration ${{ env.CONFIGURATION }} \
+            --no-build \
+            --verbosity normal
+
+      - name: Pack NuGet packages
+        run: dotnet pack PonziTech.BitVM.sln --configuration ${{ env.CONFIGURATION }} --no-build --output ./artifacts/pkg /p:Platform="Any CPU"
+
+      - name: Upload NuGet packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: artifacts/pkg/*.nupkg
+          retention-days: 30
+
+      - name: Upload symbol packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: symbol-packages
+          path: artifacts/pkg/*.snupkg
+          retention-days: 30
+
+  #############################################################################
+  # Publish to NuGet.org
+  #############################################################################
+  publish-nuget:
+    name: Publish to NuGet.org
+    needs: build-and-pack
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: ./packages
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Publish to NuGet.org
+        run: |
+          dotnet nuget push "./packages/*.nupkg" \
+            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+
+  #############################################################################
+  # Publish to GitHub Packages
+  #############################################################################
+  publish-github:
+    name: Publish to GitHub Packages
+    needs: build-and-pack
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: ./packages
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Publish to GitHub Packages
+        run: |
+          dotnet nuget push "./packages/*.nupkg" \
+            --api-key ${{ secrets.GITHUB_TOKEN }} \
+            --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
+            --skip-duplicate
+
+  #############################################################################
+  # Create GitHub Release
+  #############################################################################
+  create-release:
+    name: Create GitHub Release
+    needs: [publish-nuget, publish-github]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: ./packages
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+          # Generate changelog from commits since last tag
+          PREVIOUS_TAG=$(git tag --sort=-v:refname | grep -A1 "^v${VERSION}$" | tail -1)
+          if [ -z "$PREVIOUS_TAG" ]; then
+            PREVIOUS_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+
+          echo "## What's Changed" > release_notes.md
+          git log ${PREVIOUS_TAG}..HEAD --pretty=format:"* %s (%h)" --no-merges >> release_notes.md
+          
+          echo "" >> release_notes.md
+          echo "## Installation" >> release_notes.md
+          echo "" >> release_notes.md
+          echo '```bash' >> release_notes.md
+          echo 'dotnet add package PonziTech.BitVM.Core --version '"${VERSION}" >> release_notes.md
+          echo 'dotnet add package PonziTech.BitVM.Bridge --version '"${VERSION}" >> release_notes.md
+          echo '```' >> release_notes.md
+          echo "" >> release_notes.md
+          echo "## GitHub Packages" >> release_notes.md
+          echo "" >> release_notes.md
+          echo '```bash' >> release_notes.md
+          echo 'dotnet add package PonziTech.BitVM.Core --version '"${VERSION}"' --source https://nuget.pkg.github.com/PonziTech/index.json' >> release_notes.md
+          echo '```' >> release_notes.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release v${{ steps.release_notes.outputs.VERSION }}
+          body_path: release_notes.md
+          files: ./packages/*.nupkg
+          draft: false
+          prerelease: ${{ contains(github.ref, '-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
