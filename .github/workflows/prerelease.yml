@@ -18,10 +18,10 @@ permissions:
 
 jobs:
   #############################################################################
-  # Build Native Libraries (Windows)
+  # Build Native Libraries - Windows
   #############################################################################
-  build-native:
-    name: Build Native Libraries
+  build-native-windows:
+    name: Build Native Libraries (Windows)
     runs-on: windows-latest
     steps:
       - name: Checkout repository
@@ -42,19 +42,105 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            target
+            ffi/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build FFI
+      - name: Build FFI (Windows)
         run: |
           cd ffi
           cargo build --release
+          New-Item -ItemType Directory -Force -Path ../runtimes/win-x64/native
+          Copy-Item target/release/bitvm_ffi.dll ../runtimes/win-x64/native/
 
       - name: Upload native libraries
         uses: actions/upload-artifact@v4
         with:
-          name: native-libraries
-          path: ffi/target/release/bitvm_ffi.dll
+          name: native-libraries-windows
+          path: runtimes/win-x64/native/
+          retention-days: 1
+
+  #############################################################################
+  # Build Native Libraries - Linux
+  #############################################################################
+  build-native-linux:
+    name: Build Native Libraries (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ffi/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build FFI (Linux)
+        run: |
+          cd ffi
+          cargo build --release
+          mkdir -p ../runtimes/linux-x64/native
+          cp target/release/libbitvm_ffi.so ../runtimes/linux-x64/native/
+
+      - name: Upload native libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-libraries-linux
+          path: runtimes/linux-x64/native/
+          retention-days: 1
+
+  #############################################################################
+  # Build Native Libraries - macOS
+  #############################################################################
+  build-native-macos:
+    name: Build Native Libraries (macOS)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ffi/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build FFI (macOS)
+        run: |
+          cd ffi
+          cargo build --release
+          cargo build --release --target aarch64-apple-darwin
+          mkdir -p ../runtimes/osx-x64/native ../runtimes/osx-arm64/native
+          cp target/release/libbitvm_ffi.dylib ../runtimes/osx-x64/native/
+          cp target/aarch64-apple-darwin/release/libbitvm_ffi.dylib ../runtimes/osx-arm64/native/
+
+      - name: Upload native libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-libraries-macos
+          path: runtimes/
           retention-days: 1
 
   #############################################################################
@@ -62,7 +148,7 @@ jobs:
   #############################################################################
   build-and-pack:
     name: Build and Pack Prerelease Packages
-    needs: build-native
+    needs: [build-native-windows, build-native-linux, build-native-macos]
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -78,11 +164,28 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Download native libraries
+      - name: Download Windows native libraries
         uses: actions/download-artifact@v4
         with:
-          name: native-libraries
+          name: native-libraries-windows
           path: runtimes/win-x64/native/
+
+      - name: Download Linux native libraries
+        uses: actions/download-artifact@v4
+        with:
+          name: native-libraries-linux
+          path: runtimes/linux-x64/native/
+
+      - name: Download macOS native libraries
+        uses: actions/download-artifact@v4
+        with:
+          name: native-libraries-macos
+          path: runtimes/
+
+      - name: Verify all native libraries are present
+        run: |
+          echo "Native libraries available for packaging:"
+          find runtimes -type f -name "*.dll" -o -name "*.so" -o -name "*.dylib" | sort
 
       - name: Cache NuGet packages
         uses: actions/cache@v4
@@ -109,13 +212,6 @@ jobs:
 
       - name: Build solution
         run: dotnet build PonziTech.BitVM.sln --configuration ${{ env.CONFIGURATION }} --no-restore /p:Platform="Any CPU"
-
-      - name: Run tests
-        run: |
-          dotnet test PonziTech.BitVM.sln \
-            --configuration ${{ env.CONFIGURATION }} \
-            --no-build \
-            --verbosity normal
 
       - name: Pack Prerelease Packages
         run: |

@@ -42,4 +42,39 @@
     <ProjectReference Include="..\PonziTech.BitVM.Native\PonziTech.BitVM.Native.csproj" />
   </ItemGroup>
 
+  <!-- Native Libraries for NuGet Packaging -->
+  <ItemGroup>
+    <!-- Windows x64 -->
+    <None Include="..\..\runtimes\win-x64\native\bitvm_ffi.dll">
+      <Pack>true</Pack>
+      <PackagePath>runtimes/win-x64/native</PackagePath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </None>
+    
+    <!-- Linux x64 -->
+    <None Include="..\..\runtimes\linux-x64\native\libbitvm_ffi.so">
+      <Pack>true</Pack>
+      <PackagePath>runtimes/linux-x64/native</PackagePath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </None>
+    
+    <!-- macOS x64 -->
+    <None Include="..\..\runtimes\osx-x64\native\libbitvm_ffi.dylib">
+      <Pack>true</Pack>
+      <PackagePath>runtimes/osx-x64/native</PackagePath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </None>
+    
+    <!-- macOS ARM64 -->
+    <None Include="..\..\runtimes\osx-arm64\native\libbitvm_ffi.dylib">
+      <Pack>true</Pack>
+      <PackagePath>runtimes/osx-arm64/native</PackagePath>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </None>
+  </ItemGroup>
+
 </Project>

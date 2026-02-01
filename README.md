@@ -173,26 +173,6 @@ dotnet build PonziTech.BitVM.sln -c Release
 ./build/build.ps1 -Configuration Release -Pack
 ```
 
-### NBitcoin Flavors
-
-PonziTech.BitVM supports building against two NBitcoin implementations:
-
-**Standard (default)** - Public NBitcoin from NuGet:
-```powershell
-./build/build.ps1 -Configuration Release
-# or explicitly
-./build/build.ps1 -NBitcoinFlavor Standard
-```
-
-**Okeanos** - Internal fork with PoS, Smart Contracts, Cold Staking:
-```powershell
-./build/build.ps1 -NBitcoinFlavor Okeanos
-```
-
-The Okeanos flavor requires the [Okeanos.NBitcoin](docs/OKEANOS_INTEGRATION.md) fork to be available at `external/NBitcoin/`. This is designed for the Okeanos ecosystem.
-
-See [docs/NBITCOIN_FLAVORS.md](docs/NBITCOIN_FLAVORS.md) for detailed documentation.
-
 ## API Examples
 
 ### Script Execution

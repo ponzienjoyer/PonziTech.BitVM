@@ -89,12 +89,22 @@ jobs:
         
       - name: Test (Windows)
         if: matrix.os == 'windows-latest'
-        run: dotnet test PonziTech.BitVM.sln --configuration ${{ env.CONFIGURATION }} --no-build --verbosity normal
+        shell: pwsh
+        run: |
+          # Add native library directory to PATH
+          $env:PATH = "$PWD\runtimes\win-x64\native;$env:PATH"
+          # Also copy native libraries to test output directories
+          Copy-Item -Path "runtimes\win-x64\native\bitvm_ffi.dll" -Destination "tests\PonziTech.BitVM.UnitTests\bin\Release\net10.0\" -Force
+          Copy-Item -Path "runtimes\win-x64\native\bitvm_ffi.dll" -Destination "tests\PonziTech.BitVM.IntegrationTests\bin\Release\net10.0\" -Force
+          dotnet test PonziTech.BitVM.sln --configuration ${{ env.CONFIGURATION }} --no-build --verbosity normal
         
       - name: Test (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
           export LD_LIBRARY_PATH=$PWD/runtimes/linux-x64/native:$LD_LIBRARY_PATH
+          # Copy native libraries to test output directories
+          cp runtimes/linux-x64/native/libbitvm_ffi.so tests/PonziTech.BitVM.UnitTests/bin/Release/net10.0/ 2>/dev/null || true
+          cp runtimes/linux-x64/native/libbitvm_ffi.so tests/PonziTech.BitVM.IntegrationTests/bin/Release/net10.0/ 2>/dev/null || true
           dotnet test PonziTech.BitVM.sln --configuration ${{ env.CONFIGURATION }} --no-build --verbosity normal
         
       - name: Test (macOS)
@@ -139,9 +149,15 @@ jobs:
       - name: Download All Native Libraries
         uses: actions/download-artifact@v4
         with:
-          path: runtimes
+          path: .
           pattern: native-libraries-*
           merge-multiple: true
+          
+      - name: Verify Native Libraries
+        shell: pwsh
+        run: |
+          echo "Native libraries structure:"
+          Get-ChildItem -Path "runtimes" -Recurse -File | Select-Object FullName
           
       - name: Restore
         run: dotnet restore PonziTech.BitVM.sln /p:Platform="Any CPU"
