@@ -96,8 +96,8 @@ PonziTech.BitVM.Bridge    - Bridge operations (peg-in/peg-out graphs)
 ### Prerequisites
 
 #### Common Requirements (All Platforms)
-- [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) (8.0.100 or later)
-- [Rust toolchain](https://rustup.rs/) (latest stable)
+- [.NET 10.0 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- [Rust toolchain](https://rustup.rs/)
 - Git with submodules support
 
 #### Windows-Specific Requirements
