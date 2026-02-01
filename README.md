@@ -1,9 +1,8 @@
 # PonziTech.BitVM
 
-[![CI](https://github.com/PonziTech/BitVM/actions/workflows/ci.yml/badge.svg)](https://github.com/PonziTech/BitVM/actions)
-[![NuGet](https://img.shields.io/nuget/v/PonziTech.BitVM.Core.svg)](https://www.nuget.org/packages/PonziTech.BitVM.Core/)
+[![CI](https://github.com/ponzienjoyer/PonziTech.BitVM/actions/workflows/ci.yml/badge.svg)](https://github.com/ponzienjoyer/PonziTech.BitVM/actions/workflows/ci.yml)
 
-A production-quality C# binding to BitVM2, enabling trust-minimized Bitcoin bridges from .NET.
+An experimental C# binding to BitVM2, enabling trust-minimized Bitcoin bridges from .NET.
 
 ## Overview
 
@@ -356,7 +355,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 For questions and support:
 - GitHub Issues: [github.com/PonziTech/BitVM/issues](https://github.com/PonziTech/BitVM/issues)
-- Discord: [PonziTech Discord](https://discord.gg/ponzitech)
 
 ---
 
