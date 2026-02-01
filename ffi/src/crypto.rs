@@ -1,4 +1,6 @@
 use crate::FfiResult;
+use bitvm::signatures::public::{CompactWots, Wots, Wots16, Wots32, Wots4, Wots64, Wots80};
+use std::convert::TryFrom;
 use std::os::raw::c_char;
 
 /// Generate a Winternitz secret key
@@ -7,12 +9,7 @@ use std::os::raw::c_char;
 /// FfiResult with 32 random bytes
 #[no_mangle]
 pub extern "C" fn crypto_generate_winternitz_secret() -> FfiResult {
-    use rand::thread_rng;
-    use rand::RngCore;
-
-    let mut secret = vec![0u8; 32];
-    thread_rng().fill_bytes(&mut secret);
-
+    let secret = Wots16::generate_secret_key();
     FfiResult::ok(secret)
 }
 
@@ -35,20 +32,26 @@ pub extern "C" fn crypto_winternitz_pubkey_from_secret(
         return FfiResult::err("Null secret pointer");
     }
 
-    if secret_len != 32 {
-        return FfiResult::err("Secret must be 32 bytes");
+    if secret_len != 20 {
+        return FfiResult::err("Secret must be 20 bytes");
     }
 
     let secret = unsafe { std::slice::from_raw_parts(secret_bytes, secret_len) };
+    let secret = secret.to_vec();
 
-    // Placeholder - actual implementation would use bitvm::signatures
-    let pubkey_json = format!(
-        r#"{{"type":"winternitz","message_size":{},"secret_hash":"{}","placeholder":true}}"#,
-        message_size,
-        hex::encode(&secret[..8])
-    );
+    let result = match message_size {
+        4 => public_key_to_json::<Wots4>(&secret),
+        16 => public_key_to_json::<Wots16>(&secret),
+        32 => public_key_to_json::<Wots32>(&secret),
+        64 => public_key_to_json::<Wots64>(&secret),
+        80 => public_key_to_json::<Wots80>(&secret),
+        _ => return FfiResult::err("Unsupported message size"),
+    };
 
-    FfiResult::ok(pubkey_json.into_bytes())
+    match result {
+        Ok(bytes) => FfiResult::ok(bytes),
+        Err(err) => FfiResult::err(&err),
+    }
 }
 
 /// Sign a message with Winternitz signature
@@ -74,21 +77,30 @@ pub extern "C" fn crypto_winternitz_sign(
         return FfiResult::err("Null pointer argument");
     }
 
-    if secret_len != 32 {
-        return FfiResult::err("Secret must be 32 bytes");
+    if secret_len != 20 {
+        return FfiResult::err("Secret must be 20 bytes");
     }
 
     if message_len != message_size as usize {
         return FfiResult::err("Message length mismatch");
     }
 
-    // Placeholder - actual implementation would use bitvm::signatures
-    let sig_json = format!(
-        r#"{{"type":"winternitz","message_size":{},"signature":"placeholder"}}"#,
-        message_size
-    );
+    let secret = unsafe { std::slice::from_raw_parts(secret_bytes, secret_len) }.to_vec();
+    let message = unsafe { std::slice::from_raw_parts(message_bytes, message_len) }.to_vec();
 
-    FfiResult::ok(sig_json.into_bytes())
+    let result = match message_size {
+        4 => signature_to_json::<Wots4>(&secret, message),
+        16 => signature_to_json::<Wots16>(&secret, message),
+        32 => signature_to_json::<Wots32>(&secret, message),
+        64 => signature_to_json::<Wots64>(&secret, message),
+        80 => signature_to_json::<Wots80>(&secret, message),
+        _ => return FfiResult::err("Unsupported message size"),
+    };
+
+    match result {
+        Ok(bytes) => FfiResult::ok(bytes),
+        Err(err) => FfiResult::err(&err),
+    }
 }
 
 /// Generate Winternitz signature verification script
@@ -110,11 +122,71 @@ pub extern "C" fn crypto_winternitz_checksig_script(
         return FfiResult::err("Null pubkey pointer");
     }
 
-    // Placeholder - would generate actual script
-    let script_info = format!(
-        r#"{{"type":"winternitz_checksig","message_size":{},"compact":{},"placeholder":true}}"#,
-        message_size, compact
-    );
+    let pubkey_str = unsafe {
+        match std::ffi::CStr::from_ptr(pubkey_json).to_str() {
+            Ok(s) => s,
+            Err(_) => return FfiResult::err("Invalid UTF-8 in pubkey JSON"),
+        }
+    };
 
-    FfiResult::ok(script_info.into_bytes())
+    let pubkey_entries: Vec<Vec<u8>> = match serde_json::from_str(pubkey_str) {
+        Ok(entries) => entries,
+        Err(e) => return FfiResult::err(&format!("JSON parse error: {}", e)),
+    };
+
+    let result = match message_size {
+        4 => checksig_script::<Wots4>(pubkey_entries, compact),
+        16 => checksig_script::<Wots16>(pubkey_entries, compact),
+        32 => checksig_script::<Wots32>(pubkey_entries, compact),
+        64 => checksig_script::<Wots64>(pubkey_entries, compact),
+        80 => checksig_script::<Wots80>(pubkey_entries, compact),
+        _ => return FfiResult::err("Unsupported message size"),
+    };
+
+    match result {
+        Ok(bytes) => FfiResult::ok(bytes),
+        Err(err) => FfiResult::err(&err),
+    }
+}
+
+fn public_key_to_json<T: Wots>(secret: &[u8]) -> Result<Vec<u8>, String> {
+    let public_key = T::generate_public_key(secret);
+    let public_key_bytes: Vec<Vec<u8>> = public_key.as_ref().iter().map(|e| e.to_vec()).collect();
+    serde_json::to_vec(&public_key_bytes).map_err(|e| e.to_string())
+}
+
+fn signature_to_json<T: Wots>(secret: &[u8], message: Vec<u8>) -> Result<Vec<u8>, String> {
+    let message = T::Message::try_from(message)
+        .map_err(|_| "Invalid message length for message size".to_string())?;
+    let signature = T::sign(secret, &message);
+    let signature_bytes: Vec<Vec<u8>> = signature.as_ref().iter().map(|e| e.to_vec()).collect();
+    serde_json::to_vec(&signature_bytes).map_err(|e| e.to_string())
+}
+
+fn checksig_script<T: Wots + CompactWots>(
+    pubkey_entries: Vec<Vec<u8>>,
+    compact: bool,
+) -> Result<Vec<u8>, String> {
+    let pubkey_vec: Vec<[u8; 20]> = pubkey_entries
+        .into_iter()
+        .map(|entry| {
+            if entry.len() != 20 {
+                return Err("Public key entries must be 20 bytes".to_string());
+            }
+            let mut bytes = [0u8; 20];
+            bytes.copy_from_slice(&entry);
+            Ok(bytes)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let public_key = T::PublicKey::try_from(pubkey_vec)
+        .map_err(|_| "Invalid public key length for message size".to_string())?;
+
+    let script = if compact {
+        T::compact_checksig_verify(&public_key)
+    } else {
+        T::checksig_verify(&public_key)
+    };
+
+    Ok(script.compile().to_bytes())
 }
