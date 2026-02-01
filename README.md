@@ -328,7 +328,7 @@ cd ffi && cargo build
 
 ⚠️ **Warning: DO NOT USE IN PRODUCTION**
 
-BitVM is experimental technology. This package is in early development (v0.1.0-alpha). The API is subject to change and the underlying BitVM implementation is not yet production-ready.
+BitVM is experimental technology. This package is in early development. The API is subject to change and the underlying BitVM implementation is not yet production-ready.
 
 ## Documentation
 
