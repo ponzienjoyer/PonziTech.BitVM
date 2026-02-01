@@ -2,7 +2,7 @@ name: Prerelease Packages
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   workflow_dispatch:
 
 env:
@@ -99,15 +99,10 @@ jobs:
           BUILD_NUMBER="${{ github.run_number }}"
           SHORT_SHA="${GITHUB_SHA::7}"
           
-          if [ "${{ github.ref_name }}" = "main" ]; then
-            PRERELEASE_LABEL="alpha"
-          else
-            PRERELEASE_LABEL="preview"
-          fi
-          
-          VERSION="${BASE_VERSION}-${PRERELEASE_LABEL}.${BUILD_NUMBER}+${SHORT_SHA}"
+          # Simple prerelease: 0.1.0-alpha.{build}+sha
+          VERSION="${BASE_VERSION}-alpha.${BUILD_NUMBER}+${SHORT_SHA}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Generated version: $VERSION"
+          echo "Generated prerelease version: $VERSION"
 
       - name: Restore dependencies
         run: dotnet restore PonziTech.BitVM.sln /p:Platform="Any CPU"
