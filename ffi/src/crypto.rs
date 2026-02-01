@@ -1,5 +1,5 @@
 use crate::FfiResult;
-use bitvm::signatures::public::{CompactWots, Wots, Wots16, Wots32, Wots4, Wots64, Wots80};
+use bitvm::signatures::{CompactWots, Wots, Wots16, Wots32, Wots4, Wots64, Wots80};
 use std::convert::TryFrom;
 use std::os::raw::c_char;
 
@@ -149,13 +149,13 @@ pub extern "C" fn crypto_winternitz_checksig_script(
     }
 }
 
-fn public_key_to_json<T: Wots>(secret: &[u8]) -> Result<Vec<u8>, String> {
+fn public_key_to_json<T: Wots>(secret: &Vec<u8>) -> Result<Vec<u8>, String> {
     let public_key = T::generate_public_key(secret);
     let public_key_bytes: Vec<Vec<u8>> = public_key.as_ref().iter().map(|e| e.to_vec()).collect();
     serde_json::to_vec(&public_key_bytes).map_err(|e| e.to_string())
 }
 
-fn signature_to_json<T: Wots>(secret: &[u8], message: Vec<u8>) -> Result<Vec<u8>, String> {
+fn signature_to_json<T: Wots>(secret: &Vec<u8>, message: Vec<u8>) -> Result<Vec<u8>, String> {
     let message = T::Message::try_from(message)
         .map_err(|_| "Invalid message length for message size".to_string())?;
     let signature = T::sign(secret, &message);

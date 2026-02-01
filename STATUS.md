@@ -35,6 +35,7 @@ The repository now provides working BitVM core bindings (script execution, hashi
 - Peg-out graphs and flows are not yet exposed in the C# API.
 - Peg-in status calls require Esplora connectivity (provide `BridgeConfiguration.EsploraUrl` or rely on defaults).
 - Peg-in graphs are stored as raw JSON for round-tripping; only top-level metadata is parsed into managed fields.
+- Bridge functionality is not supported on Windows due to upstream unix-only SSH/SFTP dependencies.
 
 ---
 

@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using NBitcoin;
+using NBitcoin.DataEncoders;
 using PonziTech.BitVM.Core;
 using PonziTech.BitVM.Native;
 
@@ -131,7 +132,7 @@ public class DepositorContext : IDisposable
 
     internal byte[] GetSecretBytes() => _key.ToBytes();
 
-    internal string GetSecretHex() => Convert.ToHexString(_key.ToBytes()).ToLowerInvariant();
+    internal string GetSecretHex() => Encoders.Hex.EncodeData(_key.ToBytes()).ToLowerInvariant();
 
     public void Dispose()
     {
@@ -259,7 +260,7 @@ public class BridgeClient : IDisposable
     /// </summary>
     /// <param name="graph">Peg-in graph</param>
     /// <returns>Current status</returns>
-    public async Task<PegInDepositorStatus> GetPegInStatusAsync(PegInGraph graph)
+    public Task<PegInDepositorStatus> GetPegInStatusAsync(PegInGraph graph)
     {
         ThrowIfDisposed();
 
@@ -273,13 +274,14 @@ public class BridgeClient : IDisposable
             throw new ArgumentException("Peg-in graph is missing raw JSON data", nameof(graph));
         }
 
-        var graphJsonBytes = FfiHelpers.GetNullTerminatedUtf8(graph.RawJson);
+        var graphJsonBytes = FfiHelpers.GetNullTerminatedUtf8(graph.RawJson!);
         byte[]? esploraBytes = null;
         if (!string.IsNullOrWhiteSpace(_config.EsploraUrl))
         {
-            esploraBytes = FfiHelpers.GetNullTerminatedUtf8(_config.EsploraUrl);
+            esploraBytes = FfiHelpers.GetNullTerminatedUtf8(_config.EsploraUrl!);
         }
 
+        PegInDepositorStatus status;
         unsafe
         {
             fixed (byte* graphPtr = graphJsonBytes)
@@ -295,9 +297,11 @@ public class BridgeClient : IDisposable
                     throw new FFIException("Failed to deserialize peg-in status");
                 }
 
-                return await Task.FromResult(ParseStatus(statusDto.Code));
+                status = ParseStatus(statusDto.Code!);
             }
         }
+
+        return Task.FromResult(status);
     }
 
     /// <summary>
@@ -319,7 +323,7 @@ public class BridgeClient : IDisposable
             throw new ArgumentException("Peg-in graph is missing raw JSON data", nameof(graph));
         }
 
-        var graphJsonBytes = FfiHelpers.GetNullTerminatedUtf8(graph.RawJson);
+        var graphJsonBytes = FfiHelpers.GetNullTerminatedUtf8(graph.RawJson!);
         unsafe
         {
             fixed (byte* graphPtr = graphJsonBytes)
@@ -472,7 +476,7 @@ public class BridgeClient : IDisposable
 
         try
         {
-            return Convert.FromHexString(hex);
+            return Encoders.Hex.DecodeData(hex);
         }
         catch
         {
@@ -508,7 +512,7 @@ public class BridgeClient : IDisposable
 
             try
             {
-                list.Add(Convert.FromHexString(hex));
+                list.Add(Encoders.Hex.DecodeData(hex));
             }
             catch
             {
@@ -537,7 +541,7 @@ public class BridgeClient : IDisposable
         var result = new string[entries.Length];
         for (var i = 0; i < entries.Length; i++)
         {
-            result[i] = Convert.ToHexString(entries[i]).ToLowerInvariant();
+            result[i] = Encoders.Hex.EncodeData(entries[i]).ToLowerInvariant();
         }
         return result;
     }

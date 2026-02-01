@@ -6,6 +6,7 @@
     <LangVersion>13.0</LangVersion>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     
     <!-- NBitcoin Flavor: Standard (public NuGet) or Okeanos (internal fork) -->
     <NBitcoinFlavor Condition="'$(NBitcoinFlavor)' == ''">Standard</NBitcoinFlavor>

@@ -84,12 +84,23 @@ PonziTech.BitVM.Bridge    - Bridge operations (peg-in/peg-out graphs)
 
 ## Supported Platforms
 
+**Core (script execution + crypto):**
 | Platform | Architecture | Status |
 |----------|--------------|--------|
 | Windows | x64 | ✅ Supported |
 | Linux | x64 | ✅ Supported |
 | macOS | x64 | ✅ Supported |
 | macOS | ARM64 | ✅ Supported |
+
+**Bridge (peg-in/peg-out operations):**
+| Platform | Architecture | Status |
+|----------|--------------|--------|
+| Windows | x64 | ❌ Not supported (see note below) |
+| Linux | x64 | ✅ Supported |
+| macOS | x64 | ✅ Supported |
+| macOS | ARM64 | ✅ Supported |
+
+**Note:** The bridge Rust crate depends on unix-only SSH/SFTP components upstream. On Windows, the bridge FFI exports are present but return an error stating that bridge support is unavailable. Use WSL/Linux for bridge workflows.
 
 ## Building from Source
 

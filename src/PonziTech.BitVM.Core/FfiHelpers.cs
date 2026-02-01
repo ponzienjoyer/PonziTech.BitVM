@@ -38,7 +38,7 @@ internal static class BitVmNativeRuntime
 
 internal static class FfiHelpers
 {
-    internal static byte[] ReadBytes(BitVMNative.FfiResult result)
+    internal static unsafe byte[] ReadBytes(FfiResult result)
     {
         try
         {

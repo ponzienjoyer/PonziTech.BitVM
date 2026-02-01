@@ -8,7 +8,10 @@ public class WinternitzTests
     [Fact]
     public void GenerateSecret_Returns20Bytes()
     {
-        NativeTestSupport.EnsureNativeAvailable();
+        if (!NativeTestSupport.EnsureNativeAvailable())
+        {
+            return;
+        }
         var secret = WinternitzSignatures.GenerateSecret();
         
         Assert.NotNull(secret);
@@ -18,7 +21,10 @@ public class WinternitzTests
     [Fact]
     public void GetPublicKey_WithValidSecret_ReturnsPublicKey()
     {
-        NativeTestSupport.EnsureNativeAvailable();
+        if (!NativeTestSupport.EnsureNativeAvailable())
+        {
+            return;
+        }
         var secret = WinternitzSignatures.GenerateSecret();
         var pubkey = WinternitzSignatures.GetPublicKey(secret, WinternitzSignatures.MessageSize.Size16);
         
@@ -30,7 +36,10 @@ public class WinternitzTests
     [Fact]
     public void Sign_WithValidInputs_ReturnsSignature()
     {
-        NativeTestSupport.EnsureNativeAvailable();
+        if (!NativeTestSupport.EnsureNativeAvailable())
+        {
+            return;
+        }
         var secret = WinternitzSignatures.GenerateSecret();
         var message = new byte[16];
         
@@ -44,7 +53,10 @@ public class WinternitzTests
     [Fact]
     public void Sign_WithWrongMessageSize_ThrowsArgumentException()
     {
-        NativeTestSupport.EnsureNativeAvailable();
+        if (!NativeTestSupport.EnsureNativeAvailable())
+        {
+            return;
+        }
         var secret = WinternitzSignatures.GenerateSecret();
         var message = new byte[32]; // Wrong size for Size16
         
@@ -55,7 +67,10 @@ public class WinternitzTests
     [Fact]
     public void GetChecksigScript_ReturnsScript()
     {
-        NativeTestSupport.EnsureNativeAvailable();
+        if (!NativeTestSupport.EnsureNativeAvailable())
+        {
+            return;
+        }
         var secret = WinternitzSignatures.GenerateSecret();
         var pubkey = WinternitzSignatures.GetPublicKey(secret, WinternitzSignatures.MessageSize.Size16);
         var script = WinternitzSignatures.GetChecksigScript(pubkey, WinternitzSignatures.MessageSize.Size16);

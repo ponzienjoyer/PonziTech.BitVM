@@ -56,15 +56,16 @@ public class WinternitzSignatures
             throw new ArgumentException("Secret must be 20 bytes", nameof(secret));
         }
 
+        var secretBytes = secret.ToArray();
         return WithNative(() =>
         {
             unsafe
             {
-                fixed (byte* secretPtr = secret)
+                fixed (byte* secretPtr = secretBytes)
                 {
                     var result = BitVMNative.crypto_winternitz_pubkey_from_secret(
                         secretPtr,
-                        (nuint)secret.Length,
+                        (nuint)secretBytes.Length,
                         (uint)messageSize);
                     var jsonBytes = FfiHelpers.ReadBytes(result);
                     return FfiHelpers.DeserializeByteMatrix(jsonBytes);
@@ -92,18 +93,20 @@ public class WinternitzSignatures
             throw new ArgumentException($"Message must be {(int)messageSize} bytes", nameof(message));
         }
 
+        var secretBytes = secret.ToArray();
+        var messageBytes = message.ToArray();
         return WithNative(() =>
         {
             unsafe
             {
-                fixed (byte* secretPtr = secret)
-                fixed (byte* messagePtr = message)
+                fixed (byte* secretPtr = secretBytes)
+                fixed (byte* messagePtr = messageBytes)
                 {
                     var result = BitVMNative.crypto_winternitz_sign(
                         secretPtr,
-                        (nuint)secret.Length,
+                        (nuint)secretBytes.Length,
                         messagePtr,
-                        (nuint)message.Length,
+                        (nuint)messageBytes.Length,
                         (uint)messageSize);
                     var jsonBytes = FfiHelpers.ReadBytes(result);
                     return FfiHelpers.DeserializeByteMatrix(jsonBytes);

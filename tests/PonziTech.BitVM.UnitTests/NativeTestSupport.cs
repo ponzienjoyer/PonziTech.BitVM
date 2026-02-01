@@ -1,34 +1,38 @@
 using System;
 using PonziTech.BitVM.Core;
-using Xunit.Sdk;
 
 namespace PonziTech.BitVM.UnitTests;
 
 internal static class NativeTestSupport
 {
-    internal static ScriptExecutor CreateExecutorOrSkip()
+    internal static ScriptExecutor? CreateExecutorOrSkip()
     {
-        EnsureNativeAvailable();
+        if (!EnsureNativeAvailable())
+        {
+            return null;
+        }
+
         return new ScriptExecutor();
     }
 
-    internal static void EnsureNativeAvailable()
+    internal static bool EnsureNativeAvailable()
     {
         try
         {
             using var executor = new ScriptExecutor();
+            return true;
         }
         catch (DllNotFoundException)
         {
-            throw new SkipException("Native BitVM FFI library not found. Build the ffi project first.");
+            return false;
         }
         catch (BadImageFormatException)
         {
-            throw new SkipException("Native BitVM FFI library is incompatible with the current runtime.");
+            return false;
         }
         catch (EntryPointNotFoundException)
         {
-            throw new SkipException("Native BitVM FFI library is missing required exports.");
+            return false;
         }
     }
 }

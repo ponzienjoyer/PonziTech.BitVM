@@ -2,6 +2,12 @@
 
 This document details all dependencies required to build PonziTech.BitVM on Windows.
 
+## Windows Support Scope
+
+- **Core library** (script execution + cryptographic primitives): ✅ supported on Windows.
+- **Bridge library** (peg-in/peg-out operations): ❌ not supported on Windows due to upstream unix-only SSH/SFTP dependencies.
+- **Workaround**: Use WSL/Linux to build and run bridge workflows.
+
 ## Required Dependencies
 
 ### 1. .NET 10.0 SDK

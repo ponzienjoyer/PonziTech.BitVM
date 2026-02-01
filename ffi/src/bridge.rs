@@ -1,25 +1,53 @@
 use crate::FfiResult;
-use bitcoin::{Amount, Network, OutPoint, PublicKey, Txid};
-use bridge::client::esplora::get_esplora_url;
-use bridge::contexts::{depositor::DepositorContext, operator::OperatorContext, verifier::VerifierContext};
-use bridge::graphs::base::BaseGraph;
-use bridge::graphs::peg_in::{PegInDepositorStatus, PegInGraph};
-use bridge::serialization::try_deserialize;
-use bridge::transactions::base::Input;
-use esplora_client::Builder as EsploraBuilder;
-use serde::{Deserialize, Serialize};
-use std::ffi::CStr;
 use std::os::raw::c_char;
+
+#[cfg(not(windows))]
+use bitcoin::{Amount, Network, OutPoint, PublicKey, Txid};
+#[cfg(not(windows))]
+use bridge::client::esplora::get_esplora_url;
+#[cfg(not(windows))]
+use bridge::contexts::{
+    depositor::DepositorContext, operator::OperatorContext, verifier::VerifierContext,
+};
+#[cfg(not(windows))]
+use bridge::graphs::base::BaseGraph;
+#[cfg(not(windows))]
+use bridge::graphs::peg_in::{PegInDepositorStatus, PegInGraph};
+#[cfg(not(windows))]
+use bridge::serialization::try_deserialize;
+#[cfg(not(windows))]
+use bridge::transactions::base::Input;
+#[cfg(not(windows))]
+use esplora_client::Builder as EsploraBuilder;
+#[cfg(not(windows))]
+use serde::{Deserialize, Serialize};
+#[cfg(not(windows))]
+use std::ffi::CStr;
+#[cfg(not(windows))]
 use std::str::FromStr;
+#[cfg(not(windows))]
 use std::sync::OnceLock;
+#[cfg(not(windows))]
 use tokio::runtime::Runtime;
 
+#[cfg(windows)]
+const BRIDGE_UNSUPPORTED: &str =
+    "Bridge FFI is not available on Windows (upstream depends on unix-only openssh/sftp)";
+
+#[cfg(windows)]
+fn unsupported() -> FfiResult {
+    FfiResult::err(BRIDGE_UNSUPPORTED)
+}
+
+#[cfg(not(windows))]
 static RUNTIME: OnceLock<Runtime> = OnceLock::new();
 
+#[cfg(not(windows))]
 fn runtime() -> &'static Runtime {
     RUNTIME.get_or_init(|| Runtime::new().expect("Failed to initialize tokio runtime"))
 }
 
+#[cfg(not(windows))]
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DepositorContextDto {
@@ -28,6 +56,7 @@ struct DepositorContextDto {
     verifier_public_keys: Vec<String>,
 }
 
+#[cfg(not(windows))]
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct OperatorContextDto {
@@ -36,6 +65,7 @@ struct OperatorContextDto {
     verifier_public_keys: Vec<String>,
 }
 
+#[cfg(not(windows))]
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct VerifierContextDto {
@@ -44,6 +74,7 @@ struct VerifierContextDto {
     verifier_public_keys: Vec<String>,
 }
 
+#[cfg(not(windows))]
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PegInStatusDto {
@@ -52,6 +83,7 @@ struct PegInStatusDto {
     message: String,
 }
 
+#[cfg(not(windows))]
 fn read_cstr(ptr: *const c_char, label: &str) -> Result<String, String> {
     if ptr.is_null() {
         return Err(format!("Null pointer for {label}"));
@@ -63,6 +95,7 @@ fn read_cstr(ptr: *const c_char, label: &str) -> Result<String, String> {
         .map_err(|_| format!("Invalid UTF-8 in {label}"))
 }
 
+#[cfg(not(windows))]
 fn parse_network(network_str: &str) -> Result<Network, String> {
     match network_str.to_lowercase().as_str() {
         "mainnet" | "bitcoin" => Ok(Network::Bitcoin),
@@ -73,6 +106,7 @@ fn parse_network(network_str: &str) -> Result<Network, String> {
     }
 }
 
+#[cfg(not(windows))]
 fn parse_public_keys(keys: &[String]) -> Result<Vec<PublicKey>, String> {
     keys.iter()
         .map(|key| {
@@ -84,6 +118,7 @@ fn parse_public_keys(keys: &[String]) -> Result<Vec<PublicKey>, String> {
         .collect()
 }
 
+#[cfg(not(windows))]
 fn serialize_json<T: Serialize>(value: &T) -> FfiResult {
     match serde_json::to_vec(value) {
         Ok(bytes) => FfiResult::ok(bytes),
@@ -91,6 +126,7 @@ fn serialize_json<T: Serialize>(value: &T) -> FfiResult {
     }
 }
 
+#[cfg(not(windows))]
 fn validate_context<F>(factory: F) -> Result<(), String>
 where
     F: FnOnce() + std::panic::UnwindSafe,
@@ -99,6 +135,7 @@ where
         .map_err(|_| "Invalid secret or public keys".to_string())
 }
 
+#[cfg(not(windows))]
 fn status_code(status: &PegInDepositorStatus) -> &'static str {
     match status {
         PegInDepositorStatus::PegInDepositWait => "PegInDepositWait",
@@ -120,6 +157,15 @@ fn status_code(status: &PegInDepositorStatus) -> &'static str {
 /// FfiResult with JSON-encoded context on success
 #[no_mangle]
 pub extern "C" fn bridge_create_depositor_context(
+    network: *const c_char,
+    depositor_secret: *const c_char,
+    verifier_public_keys_json: *const c_char,
+) -> FfiResult {
+    bridge_create_depositor_context_impl(network, depositor_secret, verifier_public_keys_json)
+}
+
+#[cfg(not(windows))]
+fn bridge_create_depositor_context_impl(
     network: *const c_char,
     depositor_secret: *const c_char,
     verifier_public_keys_json: *const c_char,
@@ -165,6 +211,15 @@ pub extern "C" fn bridge_create_depositor_context(
     serialize_json(&dto)
 }
 
+#[cfg(windows)]
+fn bridge_create_depositor_context_impl(
+    _network: *const c_char,
+    _depositor_secret: *const c_char,
+    _verifier_public_keys_json: *const c_char,
+) -> FfiResult {
+    unsupported()
+}
+
 /// Create an operator context
 ///
 /// # Arguments
@@ -176,6 +231,15 @@ pub extern "C" fn bridge_create_depositor_context(
 /// FfiResult with JSON-encoded context on success
 #[no_mangle]
 pub extern "C" fn bridge_create_operator_context(
+    network: *const c_char,
+    operator_secret: *const c_char,
+    verifier_public_keys_json: *const c_char,
+) -> FfiResult {
+    bridge_create_operator_context_impl(network, operator_secret, verifier_public_keys_json)
+}
+
+#[cfg(not(windows))]
+fn bridge_create_operator_context_impl(
     network: *const c_char,
     operator_secret: *const c_char,
     verifier_public_keys_json: *const c_char,
@@ -221,6 +285,15 @@ pub extern "C" fn bridge_create_operator_context(
     serialize_json(&dto)
 }
 
+#[cfg(windows)]
+fn bridge_create_operator_context_impl(
+    _network: *const c_char,
+    _operator_secret: *const c_char,
+    _verifier_public_keys_json: *const c_char,
+) -> FfiResult {
+    unsupported()
+}
+
 /// Create a verifier context
 ///
 /// # Arguments
@@ -232,6 +305,15 @@ pub extern "C" fn bridge_create_operator_context(
 /// FfiResult with JSON-encoded context on success
 #[no_mangle]
 pub extern "C" fn bridge_create_verifier_context(
+    network: *const c_char,
+    verifier_secret: *const c_char,
+    verifier_public_keys_json: *const c_char,
+) -> FfiResult {
+    bridge_create_verifier_context_impl(network, verifier_secret, verifier_public_keys_json)
+}
+
+#[cfg(not(windows))]
+fn bridge_create_verifier_context_impl(
     network: *const c_char,
     verifier_secret: *const c_char,
     verifier_public_keys_json: *const c_char,
@@ -277,6 +359,15 @@ pub extern "C" fn bridge_create_verifier_context(
     serialize_json(&dto)
 }
 
+#[cfg(windows)]
+fn bridge_create_verifier_context_impl(
+    _network: *const c_char,
+    _verifier_secret: *const c_char,
+    _verifier_public_keys_json: *const c_char,
+) -> FfiResult {
+    unsupported()
+}
+
 /// Create a peg-in graph
 ///
 /// # Arguments
@@ -290,6 +381,23 @@ pub extern "C" fn bridge_create_verifier_context(
 /// FfiResult with JSON-encoded PegInGraph on success
 #[no_mangle]
 pub extern "C" fn bridge_create_peg_in_graph(
+    context_json: *const c_char,
+    deposit_txid: *const c_char,
+    deposit_vout: u32,
+    deposit_amount: u64,
+    evm_address: *const c_char,
+) -> FfiResult {
+    bridge_create_peg_in_graph_impl(
+        context_json,
+        deposit_txid,
+        deposit_vout,
+        deposit_amount,
+        evm_address,
+    )
+}
+
+#[cfg(not(windows))]
+fn bridge_create_peg_in_graph_impl(
     context_json: *const c_char,
     deposit_txid: *const c_char,
     deposit_vout: u32,
@@ -350,6 +458,17 @@ pub extern "C" fn bridge_create_peg_in_graph(
     }
 }
 
+#[cfg(windows)]
+fn bridge_create_peg_in_graph_impl(
+    _context_json: *const c_char,
+    _deposit_txid: *const c_char,
+    _deposit_vout: u32,
+    _deposit_amount: u64,
+    _evm_address: *const c_char,
+) -> FfiResult {
+    unsupported()
+}
+
 /// Get peg-in graph status for depositor
 ///
 /// # Arguments
@@ -360,6 +479,14 @@ pub extern "C" fn bridge_create_peg_in_graph(
 /// FfiResult with JSON-encoded status
 #[no_mangle]
 pub extern "C" fn bridge_get_peg_in_depositor_status(
+    graph_json: *const c_char,
+    esplora_url: *const c_char,
+) -> FfiResult {
+    bridge_get_peg_in_depositor_status_impl(graph_json, esplora_url)
+}
+
+#[cfg(not(windows))]
+fn bridge_get_peg_in_depositor_status_impl(
     graph_json: *const c_char,
     esplora_url: *const c_char,
 ) -> FfiResult {
@@ -399,6 +526,14 @@ pub extern "C" fn bridge_get_peg_in_depositor_status(
     serialize_json(&dto)
 }
 
+#[cfg(windows)]
+fn bridge_get_peg_in_depositor_status_impl(
+    _graph_json: *const c_char,
+    _esplora_url: *const c_char,
+) -> FfiResult {
+    unsupported()
+}
+
 /// Serialize a peg-in graph to JSON
 ///
 /// # Arguments
@@ -408,6 +543,11 @@ pub extern "C" fn bridge_get_peg_in_depositor_status(
 /// FfiResult with normalized JSON string
 #[no_mangle]
 pub extern "C" fn bridge_serialize_peg_in_graph(graph_json: *const c_char) -> FfiResult {
+    bridge_serialize_peg_in_graph_impl(graph_json)
+}
+
+#[cfg(not(windows))]
+fn bridge_serialize_peg_in_graph_impl(graph_json: *const c_char) -> FfiResult {
     let graph_str = match read_cstr(graph_json, "graph_json") {
         Ok(s) => s,
         Err(e) => return FfiResult::err(&e),
@@ -424,6 +564,11 @@ pub extern "C" fn bridge_serialize_peg_in_graph(graph_json: *const c_char) -> Ff
     }
 }
 
+#[cfg(windows)]
+fn bridge_serialize_peg_in_graph_impl(_graph_json: *const c_char) -> FfiResult {
+    unsupported()
+}
+
 /// Deserialize a peg-in graph from JSON
 ///
 /// # Arguments
@@ -433,5 +578,15 @@ pub extern "C" fn bridge_serialize_peg_in_graph(graph_json: *const c_char) -> Ff
 /// FfiResult with validated JSON
 #[no_mangle]
 pub extern "C" fn bridge_deserialize_peg_in_graph(json_data: *const c_char) -> FfiResult {
-    bridge_serialize_peg_in_graph(json_data)
+    bridge_deserialize_peg_in_graph_impl(json_data)
+}
+
+#[cfg(not(windows))]
+fn bridge_deserialize_peg_in_graph_impl(json_data: *const c_char) -> FfiResult {
+    bridge_serialize_peg_in_graph_impl(json_data)
+}
+
+#[cfg(windows)]
+fn bridge_deserialize_peg_in_graph_impl(_json_data: *const c_char) -> FfiResult {
+    unsupported()
 }

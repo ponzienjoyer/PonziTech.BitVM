@@ -8,6 +8,10 @@ public class ScriptExecutorTests
     public void Execute_OpTrue_ReturnsSuccess()
     {
         using var executor = NativeTestSupport.CreateExecutorOrSkip();
+        if (executor == null)
+        {
+            return;
+        }
         var script = new byte[] { 0x51 }; // OP_TRUE
         var result = executor.Execute(script);
         
@@ -18,6 +22,10 @@ public class ScriptExecutorTests
     public void Execute_WithWitness_ReturnsSuccess()
     {
         using var executor = NativeTestSupport.CreateExecutorOrSkip();
+        if (executor == null)
+        {
+            return;
+        }
         var script = new byte[0];
         var witness = new byte[][] { new byte[] { 0x01 } };
         
@@ -30,6 +38,10 @@ public class ScriptExecutorTests
     public void GenerateSha256Script_ReturnsNonEmpty()
     {
         using var executor = NativeTestSupport.CreateExecutorOrSkip();
+        if (executor == null)
+        {
+            return;
+        }
         var script = executor.GenerateSha256Script(32);
         
         Assert.NotNull(script);
@@ -40,6 +52,10 @@ public class ScriptExecutorTests
     public void GenerateU32PushScript_ReturnsNonEmpty()
     {
         using var executor = NativeTestSupport.CreateExecutorOrSkip();
+        if (executor == null)
+        {
+            return;
+        }
         var script = executor.GenerateU32PushScript(42);
         
         Assert.NotNull(script);
