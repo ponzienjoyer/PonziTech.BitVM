@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        tfm: [net8.0]
+        
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+          
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: ${{ matrix.os == 'windows-latest' && 'x86_64-pc-windows-msvc' || matrix.os == 'ubuntu-latest' && 'x86_64-unknown-linux-gnu' || matrix.os == 'macos-latest' && 'x86_64-apple-darwin,aarch64-apple-darwin' }}
+          
+      - name: Build FFI (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd ffi
+          cargo build --release
+          New-Item -ItemType Directory -Force -Path ..\runtimes\win-x64\native
+          Copy-Item target\release\bitvm_ffi.dll ..\runtimes\win-x64\native\
+          
+      - name: Build FFI (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cd ffi
+          cargo build --release
+          mkdir -p ../runtimes/linux-x64/native
+          cp target/release/libbitvm_ffi.so ../runtimes/linux-x64/native/
+          
+      - name: Build FFI (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          cd ffi
+          cargo build --release
+          cargo build --release --target aarch64-apple-darwin
+          mkdir -p ../runtimes/osx-x64/native ../runtimes/osx-arm64/native
+          cp target/release/libbitvm_ffi.dylib ../runtimes/osx-x64/native/
+          cp target/aarch64-apple-darwin/release/libbitvm_ffi.dylib ../runtimes/osx-arm64/native/
+          
+      - name: Restore
+        run: dotnet restore PonziTech.BitVM.sln
+        
+      - name: Build
+        run: dotnet build PonziTech.BitVM.sln --configuration Release --no-restore
+        
+      - name: Test
+        run: dotnet test PonziTech.BitVM.sln --configuration Release --no-build --verbosity normal
+        
+      - name: Upload Native Libraries
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-libraries-${{ matrix.os }}
+          path: runtimes/
+          if-no-files-found: warn
+
+  pack:
+    needs: build
+    runs-on: windows-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+          
+      - name: Download All Native Libraries
+        uses: actions/download-artifact@v4
+        with:
+          path: runtimes
+          pattern: native-libraries-*
+          merge-multiple: true
+          
+      - name: Restore
+        run: dotnet restore PonziTech.BitVM.sln
+        
+      - name: Build
+        run: dotnet build PonziTech.BitVM.sln --configuration Release --no-restore
+        
+      - name: Pack
+        run: dotnet pack PonziTech.BitVM.sln --configuration Release --no-build --output ./packages
+        
+      - name: Upload Packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: packages/*.nupkg
