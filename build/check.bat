@@ -11,7 +11,7 @@ echo [1] Checking .NET SDK...
 "%ProgramFiles%\dotnet\dotnet.exe" --version >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo     FAIL: .NET SDK not found
-    echo     Install: winget install Microsoft.DotNet.SDK.8
+    echo     Install: winget install Microsoft.DotNet.SDK.10
     set ALLGOOD=0
 ) else (
     for /f "tokens=*" %%a in ('"%ProgramFiles%\dotnet\dotnet.exe" --version') do echo     OK: .NET %%a
@@ -92,7 +92,7 @@ if "%ALLGOOD%"=="0" (
     echo STATUS: Issues found - please install missing components
     echo.
     echo Quick fix (run as Administrator):
-    echo   winget install Microsoft.DotNet.SDK.8
+    echo   winget install Microsoft.DotNet.SDK.10
     echo   winget install Rustlang.Rustup
     echo   winget install Microsoft.VisualStudio.2022.BuildTools
     echo.

@@ -38,7 +38,7 @@ REM Check for .NET
 where dotnet >nul 2>nul
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] .NET not found. Please install:
-    echo   winget install Microsoft.DotNet.SDK.8
+    echo   winget install Microsoft.DotNet.SDK.10
     pause
     exit /b 1
 )

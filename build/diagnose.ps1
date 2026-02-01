@@ -31,19 +31,19 @@ try {
     $dotnetVersion = & dotnet --version 2>$null
     if ($LASTEXITCODE -eq 0 -and $dotnetVersion) {
         Write-Host "  Version: $dotnetVersion"
-        if ($dotnetVersion -match "^8\.") {
-            Write-Host "  ✓ OK (.NET 8.0 detected)" -ForegroundColor Green
+        if ($dotnetVersion -match "^10\.") {
+            Write-Host "  ✓ OK (.NET 10.0 detected)" -ForegroundColor Green
         } else {
-            Write-Host "  ⚠ WARNING: .NET 8.0 recommended (found $dotnetVersion)" -ForegroundColor Yellow
+            Write-Host "  ⚠ WARNING: .NET 10.0 recommended (found $dotnetVersion)" -ForegroundColor Yellow
         }
     } else {
         Write-Host "  ❌ FAILED: .NET SDK not found or not working" -ForegroundColor Red
-        Write-Host "  Install: winget install Microsoft.DotNet.SDK.8" -ForegroundColor Cyan
+        Write-Host "  Install: winget install Microsoft.DotNet.SDK.10" -ForegroundColor Cyan
         $allGood = $false
     }
 } catch {
     Write-Host "  ❌ FAILED: .NET SDK not in PATH" -ForegroundColor Red
-    Write-Host "  Install: winget install Microsoft.DotNet.SDK.8" -ForegroundColor Cyan
+    Write-Host "  Install: winget install Microsoft.DotNet.SDK.10" -ForegroundColor Cyan
     $allGood = $false
 }
 Write-Host ""
@@ -154,7 +154,7 @@ if ($allGood) {
     Write-Host "❌ Some checks failed. Please install missing dependencies." -ForegroundColor Red
     Write-Host ""
     Write-Host "Quick install (run as Administrator):" -ForegroundColor Yellow
-    Write-Host "  winget install Microsoft.DotNet.SDK.8" -ForegroundColor Cyan
+    Write-Host "  winget install Microsoft.DotNet.SDK.10" -ForegroundColor Cyan
     Write-Host "  winget install Rustlang.Rustup" -ForegroundColor Cyan
     Write-Host "  winget install Microsoft.VisualStudio.2022.BuildTools" -ForegroundColor Cyan
     Write-Host ""

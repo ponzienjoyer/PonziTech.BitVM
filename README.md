@@ -41,7 +41,7 @@ var config = new BridgeConfiguration {
 using var bridge = new BridgeClient(config);
 using var depositor = DepositorContext.Create(config, depositorWif);
 
-var pegIn = await bridge.CreatePegInAsync(depositor, depositOutpoint, "0x1234...");
+var pegIn = await bridge.CreatePegInAsync(depositor, depositOutpoint, depositAmount, "0x1234...");
 ```
 
 ## Architecture
@@ -108,7 +108,7 @@ PonziTech.BitVM.Bridge    - Bridge operations (peg-in/peg-out graphs)
 **Option 2: winget (Quick Install)**
 ```powershell
 # Install all dependencies automatically
-winget install Microsoft.DotNet.SDK.8
+winget install Microsoft.DotNet.SDK.10
 winget install Rustlang.Rustup
 winget install Microsoft.VisualStudio.2022.BuildTools
 ```
@@ -197,7 +197,7 @@ var verifyScript = executor.GenerateU32EqualVerifyScript();
 ### Winternitz Signatures
 
 ```csharp
-// Generate keypair
+// Generate keypair (20-byte secret)
 var secret = WinternitzSignatures.GenerateSecret();
 var pubkey = WinternitzSignatures.GetPublicKey(secret, WinternitzSignatures.MessageSize.Size16);
 
@@ -231,7 +231,7 @@ Console.WriteLine($"Deposit to: {depositAddress}");
 
 // After funding, create peg-in graph
 var depositTx = await GetDepositTransactionAsync(); // Your implementation
-var pegIn = await bridge.CreatePegInAsync(depositor, depositTx.Outpoint, "0xYourEvmAddress");
+var pegIn = await bridge.CreatePegInAsync(depositor, depositTx.Outpoint, depositTx.Amount, "0xYourEvmAddress");
 
 // Check status
 var status = await bridge.GetPegInStatusAsync(pegIn);

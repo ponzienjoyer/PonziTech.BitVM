@@ -4,22 +4,22 @@ This document details all dependencies required to build PonziTech.BitVM on Wind
 
 ## Required Dependencies
 
-### 1. .NET 8.0 SDK
+### 1. .NET 10.0 SDK
 **Purpose**: Building and running C# projects
 
 **Installation**:
 ```powershell
 # Via winget (recommended)
-winget install Microsoft.DotNet.SDK.8
+winget install Microsoft.DotNet.SDK.10
 
 # Or download from:
-# https://dotnet.microsoft.com/download/dotnet/8.0
+# https://dotnet.microsoft.com/download/dotnet/10.0
 ```
 
 **Verification**:
 ```powershell
 dotnet --version
-# Expected: 8.0.xxx (any 8.0 version)
+# Expected: 10.0.xxx (any 10.0 version)
 ```
 
 ### 2. Rust Toolchain
@@ -77,7 +77,7 @@ cargo build
 
 ```powershell
 # Install ALL dependencies in one go
-winget install Microsoft.DotNet.SDK.8 -e
+winget install Microsoft.DotNet.SDK.10 -e
 winget install Rustlang.Rustup -e
 winget install Microsoft.VisualStudio.2022.BuildTools -e
 
@@ -138,7 +138,7 @@ $env:PATH += ";$env:USERPROFILE\.cargo\bin"
 # Check installed versions
 dotnet --list-sdks
 
-# Ensure 8.0.x is installed and in global.json
+# Ensure 10.0.x is installed and in global.json
 ```
 
 ## Manual Build (Without PowerShell Script)
@@ -169,7 +169,7 @@ dotnet test PonziTech.BitVM.sln -c Release --no-build
 
 | Component | Windows 10 | Windows 11 |
 |-----------|------------|------------|
-| .NET 8.0 | ✅ Supported | ✅ Supported |
+| .NET 10.0 | ✅ Supported | ✅ Supported |
 | Rust | ✅ Supported | ✅ Supported |
 | VS Build Tools 2022 | ✅ Supported | ✅ Supported |
 
@@ -177,7 +177,7 @@ dotnet test PonziTech.BitVM.sln -c Release --no-build
 
 Before building, verify:
 
-- [ ] .NET 8.0 SDK installed (`dotnet --version` shows 8.0.x)
+- [ ] .NET 10.0 SDK installed (`dotnet --version` shows 10.0.x)
 - [ ] Rust installed (`cargo --version` shows 1.8x.x)
 - [ ] Visual Studio Build Tools installed
 - [ ] C++ workload selected in Build Tools

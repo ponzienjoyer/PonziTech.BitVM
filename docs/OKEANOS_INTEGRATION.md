@@ -64,7 +64,7 @@ In your Okeanos project files:
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
   
   <ItemGroup>
@@ -135,7 +135,7 @@ public class BridgeService
         using var depositor = DepositorContext.Create(config, depositorWif);
         
         // Create peg-in with full Okeanos network support
-        var pegIn = await bridge.CreatePegInAsync(depositor, depositOutpoint, evmAddress);
+        var pegIn = await bridge.CreatePegInAsync(depositor, depositOutpoint, depositAmount, evmAddress);
         
         return pegIn;
     }
@@ -236,7 +236,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
           
       - name: Build
         run: dotnet build -p:NBitcoinFlavor=Okeanos
