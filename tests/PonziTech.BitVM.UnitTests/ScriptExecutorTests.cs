@@ -1,41 +1,36 @@
 using Xunit;
-using PonziTech.BitVM.Core;
 
 namespace PonziTech.BitVM.UnitTests;
 
-public class ScriptExecutorTests : IDisposable
+public class ScriptExecutorTests
 {
-    private readonly ScriptExecutor _executor;
-
-    public ScriptExecutorTests()
-    {
-        _executor = new ScriptExecutor();
-    }
-
     [Fact]
-    public void Execute_EmptyScript_ReturnsSuccess()
+    public void Execute_OpTrue_ReturnsSuccess()
     {
-        var script = new byte[0];
-        var result = _executor.Execute(script);
+        using var executor = NativeTestSupport.CreateExecutorOrSkip();
+        var script = new byte[] { 0x51 }; // OP_TRUE
+        var result = executor.Execute(script);
         
         Assert.True(result.Success);
     }
 
     [Fact]
-    public void Execute_WithWitness_ReturnsResult()
+    public void Execute_WithWitness_ReturnsSuccess()
     {
-        var script = new byte[] { 0x51 }; // OP_TRUE
+        using var executor = NativeTestSupport.CreateExecutorOrSkip();
+        var script = new byte[0];
         var witness = new byte[][] { new byte[] { 0x01 } };
         
-        var result = _executor.ExecuteWithWitness(script, witness);
+        var result = executor.ExecuteWithWitness(script, witness);
         
-        Assert.NotNull(result);
+        Assert.True(result.Success);
     }
 
     [Fact]
     public void GenerateSha256Script_ReturnsNonEmpty()
     {
-        var script = _executor.GenerateSha256Script(32);
+        using var executor = NativeTestSupport.CreateExecutorOrSkip();
+        var script = executor.GenerateSha256Script(32);
         
         Assert.NotNull(script);
         Assert.NotEmpty(script);
@@ -44,14 +39,10 @@ public class ScriptExecutorTests : IDisposable
     [Fact]
     public void GenerateU32PushScript_ReturnsNonEmpty()
     {
-        var script = _executor.GenerateU32PushScript(42);
+        using var executor = NativeTestSupport.CreateExecutorOrSkip();
+        var script = executor.GenerateU32PushScript(42);
         
         Assert.NotNull(script);
         Assert.NotEmpty(script);
-    }
-
-    public void Dispose()
-    {
-        _executor.Dispose();
     }
 }

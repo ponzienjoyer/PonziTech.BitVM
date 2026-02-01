@@ -1,4 +1,5 @@
 using Xunit;
+using Xunit.Sdk;
 using NBitcoin;
 using PonziTech.BitVM.Bridge;
 
@@ -11,6 +12,8 @@ public class BridgeClientTests : IDisposable
 
     public BridgeClientTests()
     {
+        NativeTestSupport.EnsureNativeAvailable();
+
         _config = new BridgeConfiguration
         {
             Network = BitcoinNetwork.Regtest,
@@ -80,23 +83,35 @@ public class BridgeClientTests : IDisposable
         
         using var depositor = DepositorContext.Create(_config, wif);
         var outpoint = new OutPoint(uint256.One, 0);
+        var amount = Money.Satoshis(100_000);
         
-        var pegIn = await _client.CreatePegInAsync(depositor, outpoint, "0x1234567890abcdef");
+        var pegIn = await _client.CreatePegInAsync(depositor, outpoint, amount, "0x1234567890abcdef");
         
         Assert.NotNull(pegIn);
         Assert.NotEmpty(pegIn.Id);
         Assert.Equal("0x1234567890abcdef", pegIn.DepositorEvmAddress);
+        Assert.Equal(amount, pegIn.DepositAmount);
+        Assert.False(string.IsNullOrWhiteSpace(pegIn.RawJson));
     }
 
     [Fact]
     public async Task GetPegInStatus_ReturnsStatus()
     {
+        var esploraUrl = Environment.GetEnvironmentVariable("PONZITECH_ESPLORA_URL");
+        if (string.IsNullOrWhiteSpace(esploraUrl))
+        {
+            throw new SkipException("Set PONZITECH_ESPLORA_URL to run Esplora integration tests.");
+        }
+
+        _config.EsploraUrl = esploraUrl;
+
         var key = new Key();
         var wif = key.GetWif(Network.RegTest).ToWif();
         
         using var depositor = DepositorContext.Create(_config, wif);
         var outpoint = new OutPoint(uint256.One, 0);
-        var pegIn = await _client.CreatePegInAsync(depositor, outpoint, "0x1234");
+        var amount = Money.Satoshis(100_000);
+        var pegIn = await _client.CreatePegInAsync(depositor, outpoint, amount, "0x1234");
         
         var status = await _client.GetPegInStatusAsync(pegIn);
         
@@ -111,13 +126,15 @@ public class BridgeClientTests : IDisposable
         
         using var depositor = DepositorContext.Create(_config, wif);
         var outpoint = new OutPoint(uint256.One, 0);
-        var pegIn = await _client.CreatePegInAsync(depositor, outpoint, "0x1234");
-        
+        var amount = Money.Satoshis(100_000);
+        var pegIn = await _client.CreatePegInAsync(depositor, outpoint, amount, "0x1234");
+
         var json = _client.SerializePegInGraph(pegIn);
         Assert.NotEmpty(json);
-        
+
         var deserialized = _client.DeserializePegInGraph(json);
         Assert.NotNull(deserialized);
+        Assert.Equal(pegIn.Id, deserialized.Id);
     }
 
     public void Dispose()
