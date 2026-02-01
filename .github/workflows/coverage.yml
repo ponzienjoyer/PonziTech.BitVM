@@ -1,0 +1,165 @@
+name: Coverage Report
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  CONFIGURATION: Release
+
+jobs:
+  coverage-analysis:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+          
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props', '**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+          
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ffi/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          
+      - name: Build FFI (Windows)
+        run: |
+          cd ffi
+          cargo build --release
+          New-Item -ItemType Directory -Force -Path ..\runtimes\win-x64\native
+          Copy-Item target\release\bitvm_ffi.dll ..\runtimes\win-x64\native\
+          
+      - name: Restore
+        run: dotnet restore PonziTech.BitVM.sln /p:Platform="Any CPU"
+        
+      - name: Build
+        run: dotnet build PonziTech.BitVM.sln --configuration ${{ env.CONFIGURATION }} --no-restore /p:Platform="Any CPU"
+        
+      - name: Run Tests with Coverage
+        shell: pwsh
+        run: |
+          # Add native library directory to PATH and copy to test directories
+          $env:PATH = "$PWD\runtimes\win-x64\native;$env:PATH"
+          Copy-Item -Path "runtimes\win-x64\native\bitvm_ffi.dll" -Destination "tests\PonziTech.BitVM.UnitTests\bin\Release\net10.0\" -Force
+          Copy-Item -Path "runtimes\win-x64\native\bitvm_ffi.dll" -Destination "tests\PonziTech.BitVM.IntegrationTests\bin\Release\net10.0\" -Force
+          
+          # Run tests with detailed coverage collection
+          dotnet test tests/PonziTech.BitVM.UnitTests/PonziTech.BitVM.UnitTests.csproj `
+            --configuration ${{ env.CONFIGURATION }} `
+            --no-build `
+            --verbosity normal `
+            /p:CollectCoverage=true `
+            /p:CoverletOutputFormat=cobertura,json,opencover `
+            /p:CoverletOutput=./TestResults/coverage/
+            
+          dotnet test tests/PonziTech.BitVM.IntegrationTests/PonziTech.BitVM.IntegrationTests.csproj `
+            --configuration ${{ env.CONFIGURATION }} `
+            --no-build `
+            --verbosity normal `
+            /p:CollectCoverage=true `
+            /p:CoverletOutputFormat=cobertura,json,opencover `
+            /p:CoverletOutput=./TestResults/coverage/
+            
+      - name: Merge Coverage Reports
+        shell: pwsh
+        run: |
+          # Install report generator tool
+          dotnet tool install --global dotnet-reportgenerator-globaltool --version 5.3.6
+          
+          # Create output directory
+          New-Item -ItemType Directory -Force -Path ./coverage-merged
+          
+          # Find all coverage files
+          $coverageFiles = Get-ChildItem -Path "tests" -Recurse -Filter "*.xml" | 
+            Where-Object { $_.FullName -like "*coverage*" -and $_.FullName -like "*TestResults*" } |
+            Select-Object -ExpandProperty FullName
+            
+          if ($coverageFiles.Count -eq 0) {
+            Write-Error "No coverage files found!"
+            exit 1
+          }
+          
+          Write-Host "Found coverage files:"
+          $coverageFiles | ForEach-Object { Write-Host "  $_" }
+          
+          # Merge coverage reports
+          $filesArg = $coverageFiles -join ";"
+          reportgenerator `
+            -reports:$filesArg `
+            -targetdir:./coverage-merged `
+            -reporttypes:Cobertura,Html,MarkdownSummaryGithub
+            
+      - name: Upload Merged Coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage-merged/Cobertura.xml
+          fail_ci_if_error: true
+          verbose: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ponzitech/BitVM
+          
+      - name: Generate Coverage Summary
+        shell: pwsh
+        run: |
+          # Display coverage summary from markdown report
+          if (Test-Path ./coverage-merged/SummaryGithub.md) {
+            Write-Host "::group::Coverage Summary"
+            Get-Content ./coverage-merged/SummaryGithub.md
+            Write-Host "::endgroup::"
+          }
+          
+      - name: Upload Coverage HTML Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html-report
+          path: ./coverage-merged/
+          retention-days: 30
+          
+      - name: Check Coverage Threshold
+        shell: pwsh
+        run: |
+          # Parse Cobertura XML to check coverage threshold
+          [xml]$coverage = Get-Content ./coverage-merged/Cobertura.xml
+          $lineRate = [decimal]$coverage.coverage.'line-rate'
+          $linePercentage = $lineRate * 100
+          
+          Write-Host "Current Line Coverage: $([math]::Round($linePercentage, 2))%"
+          
+          # Set threshold (adjust as needed)
+          $threshold = 70
+          
+          if ($linePercentage -lt $threshold) {
+            Write-Error "Code coverage ($([math]::Round($linePercentage, 2))%) is below threshold ($threshold%)"
+            exit 1
+          } else {
+            Write-Host "Code coverage meets threshold of $threshold%"
+          }

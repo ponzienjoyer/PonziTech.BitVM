@@ -96,7 +96,17 @@ jobs:
           # Also copy native libraries to test output directories
           Copy-Item -Path "runtimes\win-x64\native\bitvm_ffi.dll" -Destination "tests\PonziTech.BitVM.UnitTests\bin\Release\net10.0\" -Force
           Copy-Item -Path "runtimes\win-x64\native\bitvm_ffi.dll" -Destination "tests\PonziTech.BitVM.IntegrationTests\bin\Release\net10.0\" -Force
-          dotnet test PonziTech.BitVM.sln --configuration ${{ env.CONFIGURATION }} --no-build --verbosity normal
+          dotnet test PonziTech.BitVM.sln --configuration ${{ env.CONFIGURATION }} --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
+
+      - name: Test with Coverage (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $env:PATH = "$PWD\runtimes\win-x64\native;$env:PATH"
+          Copy-Item -Path "runtimes\win-x64\native\bitvm_ffi.dll" -Destination "tests\PonziTech.BitVM.UnitTests\bin\Release\net10.0\" -Force
+          Copy-Item -Path "runtimes\win-x64\native\bitvm_ffi.dll" -Destination "tests\PonziTech.BitVM.IntegrationTests\bin\Release\net10.0\" -Force
+          dotnet test tests/PonziTech.BitVM.UnitTests/PonziTech.BitVM.UnitTests.csproj --configuration ${{ env.CONFIGURATION }} --no-build --verbosity normal /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:CoverletOutput=./coverage/unit-tests.xml
+          dotnet test tests/PonziTech.BitVM.IntegrationTests/PonziTech.BitVM.IntegrationTests.csproj --configuration ${{ env.CONFIGURATION }} --no-build --verbosity normal /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura /p:CoverletOutput=./coverage/integration-tests.xml
         
       - name: Test (Linux)
         if: matrix.os == 'ubuntu-latest'
@@ -119,6 +129,17 @@ jobs:
           name: native-libraries-${{ matrix.os }}
           path: runtimes/
           retention-days: 1
+          if-no-files-found: warn
+
+      - name: Upload Coverage Reports
+        uses: actions/upload-artifact@v4
+        if: matrix.os == 'windows-latest'
+        with:
+          name: coverage-reports
+          path: |
+            tests/PonziTech.BitVM.UnitTests/coverage/
+            tests/PonziTech.BitVM.IntegrationTests/coverage/
+          retention-days: 5
           if-no-files-found: warn
 
   pack:
@@ -174,3 +195,52 @@ jobs:
           name: nuget-packages
           path: packages/*.nupkg
           retention-days: 30
+
+  coverage:
+    needs: build
+    runs-on: ubuntu-latest
+    if: always() && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main')
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Download Coverage Reports
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-reports
+          path: ./coverage
+          
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          directory: ./coverage
+          files: |
+            ./coverage/unit-tests.xml
+            ./coverage/integration-tests.xml
+          fail_ci_if_error: true
+          verbose: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ponzitech/BitVM
+          
+      - name: Generate Coverage Summary
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: ./coverage/**/coverage.cobertura.xml
+          badge: true
+          fail_below_min: false
+          format: markdown
+          hide_branch_rate: false
+          hide_complexity: true
+          indicators: true
+          output: both
+          thresholds: '60 80'
+          
+      - name: Add Coverage PR Comment
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          recreate: true
+          path: code-coverage-results.md
